@@ -122,6 +122,23 @@
     </div>
   </section>
 
+  <section class="row">
+    <div class="panel">
+      <h2>Top 10 clientes — maior Gross Rev / Mês</h2>
+      <table>
+        <thead><tr><th>Cliente</th><th class="num">Gross Rev / Mês</th></tr></thead>
+        <tbody id="tblGrossHigh"><tr><td colspan="2" class="skeleton">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Top 10 clientes — menor Gross Rev / Mês</h2>
+      <table>
+        <thead><tr><th>Cliente</th><th class="num">Gross Rev / Mês</th></tr></thead>
+        <tbody id="tblGrossLow"><tr><td colspan="2" class="skeleton">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
 </main>
 
 <script>
@@ -214,6 +231,20 @@ function getMonthlyAromaCost(fields){
   return 0;
 }
 
+function getGrossRevClientMes(fields){
+  // Campo correto na tabela "Profitability": coluna "Gross Rev Client / Mes".
+  const value = fields["Gross Rev Client / Mes"];
+
+  if(typeof value === "number") return value;
+
+  if(typeof value === "string"){
+    const parsed = Number(value.replace(/[^0-9.-]+/g, ""));
+    if(!Number.isNaN(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
 function computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption}){
   const now = new Date();
   const yearStart = new Date(now.getFullYear(),0,1);
@@ -289,6 +320,20 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     }))
     .sort((a,b)=>b.mrr-a.mrr).slice(0,5);
 
+  // Maiores e menores Gross Rev Client / Mes — tabela Profitability
+  const grossRows = [...activeProfit]
+    .map(r=>({
+      name: (r.fields.Client||"").split("\n")[0] || "—",
+      gross: getGrossRevClientMes(r.fields || {})
+    }))
+    .filter(r=>r.name !== "—" && Number.isFinite(r.gross));
+
+  const grossHigh = [...grossRows].sort((a,b)=>b.gross-a.gross).slice(0,10);
+  const grossLow  = [...grossRows]
+    .filter(r=>r.gross > 0)
+    .sort((a,b)=>a.gross-b.gross)
+    .slice(0,10);
+
   return {
     totalClients, totalDiffusers, mrr, arr,
     aromaL, aromaActiveCount: activeProfit.length,
@@ -299,7 +344,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     diffMonth, diffPrevMonth,
     pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
     cancelledClients: clients.filter(r=>r.fields.Status==="Cancelled").length,
-    upcoming, topClients
+    upcoming, topClients, grossHigh, grossLow
   };
 }
 
@@ -358,6 +403,19 @@ function render(k){
     </tr>
   `).join("");
 
+  // Gross Rev Client / Mes — maiores e menores
+  const renderGrossRows = rows => rows.length===0
+    ? `<tr><td colspan="2" class="skeleton">Nenhum registro encontrado.</td></tr>`
+    : rows.map(c=>`
+      <tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td class="num">${fmtMoney2(c.gross)}</td>
+      </tr>
+    `).join("");
+
+  document.getElementById("tblGrossHigh").innerHTML = renderGrossRows(k.grossHigh || []);
+  document.getElementById("tblGrossLow").innerHTML  = renderGrossRows(k.grossLow || []);
+
   document.getElementById("updated").textContent = "Atualizado " + new Date().toLocaleTimeString(CONFIG.DATE_LOCALE);
 }
 
@@ -380,7 +438,7 @@ async function load(){
         "fields[]":["Client","Status","Diffusers (number)","Receita bruta mes","Country"]
       }),
       airtableFetchAll(CONFIG.TABLE_PROFIT, {
-        "fields[]":["Client","Status","Consumo mes"]
+        "fields[]":["Client","Status","Consumo mes","Gross Rev Client / Mes"]
       }),
       airtableFetchAll(CONFIG.TABLE_INVOICES, {
         "fields[]":["Invoice Number","Amount","Amount Paid","System Status","Invoice date"]
