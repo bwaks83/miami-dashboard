@@ -36,6 +36,7 @@
   .grid{display:grid;gap:16px}
   .kpis{grid-template-columns:repeat(4,1fr);}
   .kpis-2{grid-template-columns:repeat(3,1fr);}
+  .kpis-5{grid-template-columns:repeat(5,1fr);} 
   .panel{
     background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:18px 20px;
@@ -64,12 +65,13 @@
   @media (max-width:1100px){
     .kpis{grid-template-columns:repeat(2,1fr)}
     .kpis-2{grid-template-columns:repeat(2,1fr)}
+    .kpis-5{grid-template-columns:repeat(2,1fr)}
     .row{grid-template-columns:1fr}
   }
   @media (max-width:600px){
     main{padding:14px}
     header{padding:14px}
-    .kpis,.kpis-2{grid-template-columns:1fr}
+    .kpis,.kpis-2,.kpis-5{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -92,8 +94,9 @@
     <div class="panel kpi"><div class="label">Receita anualizada (ARR)</div><div class="value" id="kpiARR">—</div><div class="sub">MRR × 12</div></div>
   </section>
 
-  <section class="grid kpis" style="margin-top:16px">
+  <section class="grid kpis-5" style="margin-top:16px">
     <div class="panel kpi"><div class="label">Consumo de aroma no mês</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
+    <div class="panel kpi"><div class="label">Aroma vendido total</div><div class="value" id="kpiAromaSales">—</div><div class="sub" id="kpiAromaSalesSub"></div></div>
     <div class="panel kpi"><div class="label">Faturas em aberto (ano)</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
     <div class="panel kpi"><div class="label">Total pago no ano</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
     <div class="panel kpi"><div class="label">Difusores instalados no mês</div><div class="value" id="kpiInstalls">—</div><div class="sub" id="kpiInstallsSub"></div></div>
@@ -134,6 +137,7 @@ const CONFIG = {
   TABLE_INVOICES: "tblcOo172xvkBPa3Z",
   TABLE_INSTALLS: "tbl38V24tAvsMClX0",
   TABLE_PAYMENTS: "tblAN0l0I3ZfrsVqc",
+  TABLE_AROMA_SALES: "Aroma Sales",
 
   CURRENCY: "USD",         // moeda usada nos campos do Airtable
   LOCALE:   "en-US",       // formatação de moeda (use "pt-BR" para R$)
@@ -154,7 +158,8 @@ const fmtDate = iso => {
   return d.toLocaleDateString(CONFIG.DATE_LOCALE,{day:"2-digit",month:"short",year:"numeric"});
 };
 async function airtableFetchAll(tableId, params={}){
-  const url = new URL(`https://api.airtable.com/v0/${CONFIG.BASE_ID}/${tableId}`);
+  const safeTableId = encodeURIComponent(tableId);
+  const url = new URL(`https://api.airtable.com/v0/${CONFIG.BASE_ID}/${safeTableId}`);
   Object.entries(params).forEach(([k,v])=>{
     if(Array.isArray(v)) v.forEach(x=>url.searchParams.append(k,x));
     else url.searchParams.set(k,v);
@@ -175,7 +180,22 @@ async function airtableFetchAll(tableId, params={}){
 /* ============================================================
    Cálculos
    ============================================================ */
-function computeKPIs({clients, profit, invoices, installs, payments}){
+function getAromaSaleAmount(fields){
+  // Campo correto na tabela "Aroma Sales": coluna "Total Fatura".
+  // Não usar fallback para outros campos, para evitar somar valores errados.
+  const value = fields["Total Fatura"];
+
+  if(typeof value === "number") return value;
+
+  if(typeof value === "string"){
+    const parsed = Number(value.replace(/[^0-9.-]+/g, ""));
+    if(!Number.isNaN(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
+function computeKPIs({clients, profit, invoices, installs, payments, aromaSales}){
   const now = new Date();
   const yearStart = new Date(now.getFullYear(),0,1);
   const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
@@ -214,6 +234,10 @@ function computeKPIs({clients, profit, invoices, installs, payments}){
   });
   const paidYearTotal = paidYearPayments.reduce((a,r)=>a+(r.fields["Amount Paid"]||0),0);
 
+  // Total vendido em Aroma Sales
+  const aromaSalesRecords = aromaSales || [];
+  const aromaSalesTotal = aromaSalesRecords.reduce((a,r)=>a+getAromaSaleAmount(r.fields || {}),0);
+
   // Instalações
   const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
   const installsDone = installs.filter(isDone).filter(r=>r.fields.Date);
@@ -247,6 +271,7 @@ function computeKPIs({clients, profit, invoices, installs, payments}){
     aromaL, aromaActiveCount: activeProfit.length,
     openTotal, openCount: openInvoices.length,
     paidYearTotal, paidYearCount: paidYearPayments.length,
+    aromaSalesTotal, aromaSalesCount: aromaSalesRecords.length,
     diffMonth, diffPrevMonth,
     pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
     cancelledClients: clients.filter(r=>r.fields.Status==="Cancelled").length,
@@ -267,6 +292,8 @@ function render(k){
 
   document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:1})} L`;
   document.getElementById("kpiAromaSub").textContent = `de ${k.aromaActiveCount} clientes ativos`;
+  document.getElementById("kpiAromaSales").textContent = fmtMoney2(k.aromaSalesTotal);
+  document.getElementById("kpiAromaSalesSub").textContent = `${k.aromaSalesCount} vendas registradas`;
   document.getElementById("kpiInvoices").textContent = fmtMoney(k.openTotal);
   document.getElementById("kpiInvoicesSub").textContent = `${k.openCount} faturas não pagas`;
   document.getElementById("kpiPaid").textContent = fmtMoney(k.paidYearTotal);
@@ -322,7 +349,7 @@ async function load(){
     if(!CONFIG.AIRTABLE_TOKEN || CONFIG.AIRTABLE_TOKEN.startsWith("PAT_COLOQUE")){
       throw new Error("Configure CONFIG.AIRTABLE_TOKEN no topo do arquivo HTML antes de hospedar.");
     }
-    const [clients, profit, invoices, installs, payments] = await Promise.all([
+    const [clients, profit, invoices, installs, payments, aromaSales] = await Promise.all([
       airtableFetchAll(CONFIG.TABLE_CLIENTS, {
         "fields[]":["Client","Status","Diffusers (number)","Receita bruta mes","Country"]
       }),
@@ -337,9 +364,12 @@ async function load(){
       }),
       airtableFetchAll(CONFIG.TABLE_PAYMENTS, {
         "fields[]":["Date","Amount Paid"]
+      }),
+      airtableFetchAll(CONFIG.TABLE_AROMA_SALES, {
+        "fields[]":["Total Fatura"]
       })
     ]);
-    const k = computeKPIs({clients, profit, invoices, installs, payments});
+    const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales});
     render(k);
   }catch(e){
     console.error(e);
