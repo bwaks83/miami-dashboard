@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dashboard Miami</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel-2:#1f242e;
+    --border:#262c38;
+    --text:#e6e8ee;
+    --muted:#8a93a6;
+    --accent:#6aa9ff;
+    --good:#3ddc97;
+    --bad:#ff6b6b;
+    --warn:#ffb86b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;}
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 28px;border-bottom:1px solid var(--border);background:#0c0e12;
+    position:sticky;top:0;z-index:10;
+  }
+  header h1{font-size:18px;margin:0;letter-spacing:.3px}
+  header .meta{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+  header button{
+    background:var(--panel-2);color:var(--text);border:1px solid var(--border);
+    padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;
+  }
+  header button:hover{background:#2a313e}
+  header button:disabled{opacity:.5;cursor:not-allowed}
+  main{padding:24px 28px;max-width:1400px;margin:0 auto}
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(4,1fr);}
+  .kpis-2{grid-template-columns:repeat(3,1fr);}
+  .panel{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;
+  }
+  .kpi .label{color:var(--muted);font-size:12px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
+  .kpi .value{font-size:28px;font-weight:600;line-height:1.1}
+  .kpi .sub{margin-top:6px;color:var(--muted);font-size:12px}
+  .delta-up{color:var(--good)}
+  .delta-down{color:var(--bad)}
+  .delta-flat{color:var(--muted)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+  .row.full{grid-template-columns:1fr}
+  .panel h2{margin:0 0 14px 0;font-size:14px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:var(--panel-2);color:var(--muted);border:1px solid var(--border)}
+  .skeleton{color:var(--muted);font-style:italic}
+  .error{
+    color:var(--bad);background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);
+    padding:14px 16px;border-radius:10px;margin-bottom:16px;font-size:14px;
+  }
+  .legend{font-size:12px;color:var(--muted);margin-top:6px}
+  @media (max-width:1100px){
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .kpis-2{grid-template-columns:repeat(2,1fr)}
+    .row{grid-template-columns:1fr}
+  }
+  @media (max-width:600px){
+    main{padding:14px}
+    header{padding:14px}
+    .kpis,.kpis-2{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dashboard Miami</h1>
+  <div class="meta">
+    <span id="updated">Carregando…</span>
+    <button id="refreshBtn">Atualizar</button>
+  </div>
+</header>
+
+<main>
+  <div id="errorBox"></div>
+
+  <section class="grid kpis">
+    <div class="panel kpi"><div class="label">Clientes ativos</div><div class="value" id="kpiClients">—</div><div class="sub" id="kpiClientsSub"></div></div>
+    <div class="panel kpi"><div class="label">Difusores ativos</div><div class="value" id="kpiDiffusers">—</div><div class="sub" id="kpiDiffusersSub"></div></div>
+    <div class="panel kpi"><div class="label">Receita recorrente (MRR)</div><div class="value" id="kpiMRR">—</div><div class="sub">no mês corrente</div></div>
+    <div class="panel kpi"><div class="label">Receita anualizada (ARR)</div><div class="value" id="kpiARR">—</div><div class="sub">MRR × 12</div></div>
+  </section>
+
+  <section class="grid kpis" style="margin-top:16px">
+    <div class="panel kpi"><div class="label">Consumo de aroma no mês</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
+    <div class="panel kpi"><div class="label">Faturas em aberto (ano)</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
+    <div class="panel kpi"><div class="label">Total pago no ano</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
+    <div class="panel kpi"><div class="label">Difusores instalados no mês</div><div class="value" id="kpiInstalls">—</div><div class="sub" id="kpiInstallsSub"></div></div>
+  </section>
+
+  <section class="row">
+    <div class="panel">
+      <h2>Próximas 5 instalações</h2>
+      <table>
+        <thead><tr><th>Cliente</th><th>Data</th><th class="num">Difusores</th><th>Status</th></tr></thead>
+        <tbody id="tblNext"><tr><td colspan="4" class="skeleton">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Top 5 clientes por MRR</h2>
+      <table>
+        <thead><tr><th>Cliente</th><th class="num">Difusores</th><th class="num">MRR</th></tr></thead>
+        <tbody id="tblTop"><tr><td colspan="3" class="skeleton">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ============================================================
+   CONFIGURAÇÃO — preencher antes de hospedar
+   ============================================================ */
+const CONFIG = {
+  // Cole aqui o Personal Access Token gerado em https://airtable.com/create/tokens
+  // Escopos necessários: data.records:read, schema.bases:read
+  // Escopo de acesso: somente a base "B2B clients.csv"
+  AIRTABLE_TOKEN: "patjGfofkoCIlnwwE.fc292b29b27c459b961f8cb479d6af13a3b296b18462f3d160cefaae66fd9d18",
+
+  BASE_ID:        "appPzeuPqekWJV5wR", // B2B clients.csv
+  TABLE_CLIENTS:  "tblEWpUn5Z2OFcQrE",
+  TABLE_PROFIT:   "tblNhMV8EooNZUzWL",
+  TABLE_INVOICES: "tblcOo172xvkBPa3Z",
+  TABLE_INSTALLS: "tbl38V24tAvsMClX0",
+  TABLE_PAYMENTS: "tblAN0l0I3ZfrsVqc",
+
+  CURRENCY: "USD",         // moeda usada nos campos do Airtable
+  LOCALE:   "en-US",       // formatação de moeda (use "pt-BR" para R$)
+  DATE_LOCALE: "pt-BR",    // formatação das datas no display
+
+  AUTO_REFRESH_MIN: 10     // minutos entre auto-refreshes; 0 desativa
+};
+
+/* ============================================================
+   Helpers
+   ============================================================ */
+const fmtMoney = n => new Intl.NumberFormat(CONFIG.LOCALE,{style:"currency",currency:CONFIG.CURRENCY,maximumFractionDigits:0}).format(n||0);
+const fmtMoney2 = n => new Intl.NumberFormat(CONFIG.LOCALE,{style:"currency",currency:CONFIG.CURRENCY,maximumFractionDigits:2}).format(n||0);
+const fmtNum = n => new Intl.NumberFormat(CONFIG.DATE_LOCALE).format(n||0);
+const fmtDate = iso => {
+  if(!iso) return "—";
+  const d = new Date(iso+"T00:00:00");
+  return d.toLocaleDateString(CONFIG.DATE_LOCALE,{day:"2-digit",month:"short",year:"numeric"});
+};
+async function airtableFetchAll(tableId, params={}){
+  const url = new URL(`https://api.airtable.com/v0/${CONFIG.BASE_ID}/${tableId}`);
+  Object.entries(params).forEach(([k,v])=>{
+    if(Array.isArray(v)) v.forEach(x=>url.searchParams.append(k,x));
+    else url.searchParams.set(k,v);
+  });
+  const records = [];
+  let offset;
+  do{
+    if(offset) url.searchParams.set("offset",offset);
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${CONFIG.AIRTABLE_TOKEN}` } });
+    if(!res.ok) throw new Error(`Airtable ${tableId}: ${res.status} ${res.statusText}`);
+    const data = await res.json();
+    records.push(...data.records);
+    offset = data.offset;
+  } while(offset);
+  return records;
+}
+
+/* ============================================================
+   Cálculos
+   ============================================================ */
+function computeKPIs({clients, profit, invoices, installs, payments}){
+  const now = new Date();
+  const yearStart = new Date(now.getFullYear(),0,1);
+  const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
+  const prevMonthStart = new Date(now.getFullYear(),now.getMonth()-1,1);
+
+  // Active = Status "Active"
+  const isActive = r => r.fields.Status === "Active";
+  const activeClients = clients.filter(isActive);
+  const activeProfit  = profit.filter(isActive);
+
+  const totalClients   = activeClients.length;
+  const totalDiffusers = activeClients.reduce((a,r)=>a+(r.fields["Diffusers (number)"]||0),0);
+  const mrr            = activeClients.reduce((a,r)=>a+(r.fields["Receita bruta mes"]||0),0);
+  const arr            = mrr*12;
+
+  // Consumo de aroma (mL → L)
+  const aromaMl = activeProfit.reduce((a,r)=>a+(r.fields["Consumo mes"]||0),0);
+  const aromaL  = aromaMl/1000;
+
+  // Faturas em aberto no ano calendário
+  const openInvoices = invoices.filter(r=>{
+    const d = r.fields["Invoice date"];
+    if(!d) return false;
+    const date = new Date(d+"T00:00:00");
+    if(date < yearStart || date > now) return false;
+    return r.fields["System Status"] !== "Paid";
+  });
+  const openTotal   = openInvoices.reduce((a,r)=>a+((r.fields.Amount||0) - (r.fields["Amount Paid"]||0)),0);
+
+  // Total pago no ano: Payments com Date no ano calendário corrente,
+  // independente da data da Invoice associada.
+  const paidYearPayments = (payments||[]).filter(r=>{
+    const d = r.fields.Date;
+    if(!d) return false;
+    return new Date(d+"T00:00:00").getFullYear() === now.getFullYear();
+  });
+  const paidYearTotal = paidYearPayments.reduce((a,r)=>a+(r.fields["Amount Paid"]||0),0);
+
+  // Instalações
+  const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
+  const installsDone = installs.filter(isDone).filter(r=>r.fields.Date);
+
+  const nextMonthStart = new Date(now.getFullYear(),now.getMonth()+1,1);
+  const diffMonth = installsDone
+    .filter(r=>{const d=new Date(r.fields.Date+"T00:00:00");return d>=monthStart && d<nextMonthStart;})
+    .reduce((a,r)=>a+(r.fields.Diffusers||0),0);
+  const diffPrevMonth = installsDone
+    .filter(r=>{const d=new Date(r.fields.Date+"T00:00:00");return d>=prevMonthStart && d<monthStart;})
+    .reduce((a,r)=>a+(r.fields.Diffusers||0),0);
+
+  // Próximas 5 instalações: data futura E não "done"
+  const upcoming = installs
+    .filter(r=>r.fields.Date && !isDone(r))
+    .filter(r=>new Date(r.fields.Date+"T00:00:00") >= new Date(now.getFullYear(),now.getMonth(),now.getDate()))
+    .sort((a,b)=>new Date(a.fields.Date) - new Date(b.fields.Date))
+    .slice(0,5);
+
+  // Top 5 clientes por MRR
+  const topClients = [...activeClients]
+    .map(r=>({
+      name: (r.fields.Client||"").split("\n")[0],
+      mrr: r.fields["Receita bruta mes"]||0,
+      diffusers: r.fields["Diffusers (number)"]||0
+    }))
+    .sort((a,b)=>b.mrr-a.mrr).slice(0,5);
+
+  return {
+    totalClients, totalDiffusers, mrr, arr,
+    aromaL, aromaActiveCount: activeProfit.length,
+    openTotal, openCount: openInvoices.length,
+    paidYearTotal, paidYearCount: paidYearPayments.length,
+    diffMonth, diffPrevMonth,
+    pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
+    cancelledClients: clients.filter(r=>r.fields.Status==="Cancelled").length,
+    upcoming, topClients
+  };
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+function render(k){
+  document.getElementById("kpiClients").textContent   = fmtNum(k.totalClients);
+  document.getElementById("kpiClientsSub").textContent= `${k.pausedClients} pausados · ${k.cancelledClients} cancelados`;
+  document.getElementById("kpiDiffusers").textContent = fmtNum(k.totalDiffusers);
+  document.getElementById("kpiDiffusersSub").textContent = `em ${k.totalClients} clientes ativos`;
+  document.getElementById("kpiMRR").textContent       = fmtMoney(k.mrr);
+  document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
+
+  document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:1})} L`;
+  document.getElementById("kpiAromaSub").textContent = `de ${k.aromaActiveCount} clientes ativos`;
+  document.getElementById("kpiInvoices").textContent = fmtMoney(k.openTotal);
+  document.getElementById("kpiInvoicesSub").textContent = `${k.openCount} faturas não pagas`;
+  document.getElementById("kpiPaid").textContent = fmtMoney(k.paidYearTotal);
+  document.getElementById("kpiPaidSub").textContent = `${k.paidYearCount} pagamentos em ${new Date().getFullYear()}`;
+
+  // Comparativo mensal
+  const delta = k.diffMonth - k.diffPrevMonth;
+  const pct = k.diffPrevMonth ? (delta/k.diffPrevMonth*100) : (k.diffMonth?100:0);
+  const cls = delta>0?"delta-up":delta<0?"delta-down":"delta-flat";
+  const arrow = delta>0?"▲":delta<0?"▼":"▬";
+  document.getElementById("kpiInstalls").textContent = fmtNum(k.diffMonth);
+  document.getElementById("kpiInstallsSub").innerHTML =
+    `<span class="${cls}">${arrow} ${delta>=0?"+":""}${delta} (${pct.toFixed(0)}%)</span> vs mês passado (${k.diffPrevMonth})`;
+
+  // Próximas instalações
+  const nextBody = document.getElementById("tblNext");
+  nextBody.innerHTML = k.upcoming.length===0
+    ? `<tr><td colspan="4" class="skeleton">Nenhuma instalação agendada.</td></tr>`
+    : k.upcoming.map(r=>{
+        const status = (r.fields.Notes||"").trim() || "—";
+        return `<tr>
+          <td>${escapeHtml(r.fields.Name||"—")}</td>
+          <td>${fmtDate(r.fields.Date)}</td>
+          <td class="num">${fmtNum(r.fields.Diffusers||0)}</td>
+          <td><span class="badge">${escapeHtml(status)}</span></td>
+        </tr>`;
+      }).join("");
+
+  // Top clients
+  const topBody = document.getElementById("tblTop");
+  topBody.innerHTML = k.topClients.map(c=>`
+    <tr>
+      <td>${escapeHtml(c.name)}</td>
+      <td class="num">${fmtNum(c.diffusers)}</td>
+      <td class="num">${fmtMoney2(c.mrr)}</td>
+    </tr>
+  `).join("");
+
+  document.getElementById("updated").textContent = "Atualizado " + new Date().toLocaleTimeString(CONFIG.DATE_LOCALE);
+}
+
+function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+async function load(){
+  const btn = document.getElementById("refreshBtn");
+  btn.disabled = true;
+  document.getElementById("errorBox").innerHTML = "";
+  document.getElementById("updated").textContent = "Carregando…";
+  try{
+    if(!CONFIG.AIRTABLE_TOKEN || CONFIG.AIRTABLE_TOKEN.startsWith("PAT_COLOQUE")){
+      throw new Error("Configure CONFIG.AIRTABLE_TOKEN no topo do arquivo HTML antes de hospedar.");
+    }
+    const [clients, profit, invoices, installs, payments] = await Promise.all([
+      airtableFetchAll(CONFIG.TABLE_CLIENTS, {
+        "fields[]":["Client","Status","Diffusers (number)","Receita bruta mes","Country"]
+      }),
+      airtableFetchAll(CONFIG.TABLE_PROFIT, {
+        "fields[]":["Client","Status","Consumo mes"]
+      }),
+      airtableFetchAll(CONFIG.TABLE_INVOICES, {
+        "fields[]":["Invoice Number","Amount","Amount Paid","System Status","Invoice date"]
+      }),
+      airtableFetchAll(CONFIG.TABLE_INSTALLS, {
+        "fields[]":["Name","Date","Diffusers","Notes"]
+      }),
+      airtableFetchAll(CONFIG.TABLE_PAYMENTS, {
+        "fields[]":["Date","Amount Paid"]
+      })
+    ]);
+    const k = computeKPIs({clients, profit, invoices, installs, payments});
+    render(k);
+  }catch(e){
+    console.error(e);
+    document.getElementById("errorBox").innerHTML = `<div class="error"><strong>Erro ao carregar:</strong> ${escapeHtml(e.message)}</div>`;
+    document.getElementById("updated").textContent = "Falha ao atualizar";
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("refreshBtn").addEventListener("click", load);
+load();
+if(CONFIG.AUTO_REFRESH_MIN>0){
+  setInterval(load, CONFIG.AUTO_REFRESH_MIN*60*1000);
+}
+</script>
+</body>
+</html>
