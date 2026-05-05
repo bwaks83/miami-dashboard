@@ -36,7 +36,8 @@
   .grid{display:grid;gap:16px}
   .kpis{grid-template-columns:repeat(4,1fr);}
   .kpis-2{grid-template-columns:repeat(3,1fr);}
-  .kpis-5{grid-template-columns:repeat(5,1fr);} 
+  .kpis-5{grid-template-columns:repeat(5,1fr);}
+  .kpis-6{grid-template-columns:repeat(6,1fr);} 
   .panel{
     background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:18px 20px;
@@ -66,12 +67,13 @@
     .kpis{grid-template-columns:repeat(2,1fr)}
     .kpis-2{grid-template-columns:repeat(2,1fr)}
     .kpis-5{grid-template-columns:repeat(2,1fr)}
+    .kpis-6{grid-template-columns:repeat(2,1fr)}
     .row{grid-template-columns:1fr}
   }
   @media (max-width:600px){
     main{padding:14px}
     header{padding:14px}
-    .kpis,.kpis-2,.kpis-5{grid-template-columns:1fr}
+    .kpis,.kpis-2,.kpis-5,.kpis-6{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -87,10 +89,11 @@
 <main>
   <div id="errorBox"></div>
 
-  <section class="grid kpis">
+  <section class="grid kpis-5">
     <div class="panel kpi"><div class="label">Clientes ativos</div><div class="value" id="kpiClients">—</div><div class="sub" id="kpiClientsSub"></div></div>
     <div class="panel kpi"><div class="label">Difusores ativos</div><div class="value" id="kpiDiffusers">—</div><div class="sub" id="kpiDiffusersSub"></div></div>
     <div class="panel kpi"><div class="label">Receita recorrente (MRR)</div><div class="value" id="kpiMRR">—</div><div class="sub">no mês corrente</div></div>
+    <div class="panel kpi"><div class="label">Custo de aroma no mês</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
     <div class="panel kpi"><div class="label">Receita anualizada (ARR)</div><div class="value" id="kpiARR">—</div><div class="sub">MRR × 12</div></div>
   </section>
 
@@ -138,6 +141,7 @@ const CONFIG = {
   TABLE_INSTALLS: "tbl38V24tAvsMClX0",
   TABLE_PAYMENTS: "tblAN0l0I3ZfrsVqc",
   TABLE_AROMA_SALES: "Aroma Sales",
+  TABLE_CONSUMPTION: "Consumption",
 
   CURRENCY: "USD",         // moeda usada nos campos do Airtable
   LOCALE:   "en-US",       // formatação de moeda (use "pt-BR" para R$)
@@ -195,7 +199,22 @@ function getAromaSaleAmount(fields){
   return 0;
 }
 
-function computeKPIs({clients, profit, invoices, installs, payments, aromaSales}){
+
+function getMonthlyAromaCost(fields){
+  // Campo correto na tabela "Consumption": coluna "Custo Mensal".
+  const value = fields["Custo Mensal"];
+
+  if(typeof value === "number") return value;
+
+  if(typeof value === "string"){
+    const parsed = Number(value.replace(/[^0-9.-]+/g, ""));
+    if(!Number.isNaN(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
+function computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption}){
   const now = new Date();
   const yearStart = new Date(now.getFullYear(),0,1);
   const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
@@ -238,6 +257,10 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales}
   const aromaSalesRecords = aromaSales || [];
   const aromaSalesTotal = aromaSalesRecords.reduce((a,r)=>a+getAromaSaleAmount(r.fields || {}),0);
 
+  // Custo de aroma no mês — tabela Consumption, coluna Custo Mensal
+  const consumptionRecords = consumption || [];
+  const aromaCostMonth = consumptionRecords.reduce((a,r)=>a+getMonthlyAromaCost(r.fields || {}),0);
+
   // Instalações
   const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
   const installsDone = installs.filter(isDone).filter(r=>r.fields.Date);
@@ -272,6 +295,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales}
     openTotal, openCount: openInvoices.length,
     paidYearTotal, paidYearCount: paidYearPayments.length,
     aromaSalesTotal, aromaSalesCount: aromaSalesRecords.length,
+    aromaCostMonth, aromaCostCount: consumptionRecords.length,
     diffMonth, diffPrevMonth,
     pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
     cancelledClients: clients.filter(r=>r.fields.Status==="Cancelled").length,
@@ -294,6 +318,8 @@ function render(k){
   document.getElementById("kpiAromaSub").textContent = `de ${k.aromaActiveCount} clientes ativos`;
   document.getElementById("kpiAromaSales").textContent = fmtMoney2(k.aromaSalesTotal);
   document.getElementById("kpiAromaSalesSub").textContent = `${k.aromaSalesCount} vendas registradas`;
+  document.getElementById("kpiAromaCost").textContent = fmtMoney2(k.aromaCostMonth);
+  document.getElementById("kpiAromaCostSub").textContent = `${k.aromaCostCount} registros em Consumption`;
   document.getElementById("kpiInvoices").textContent = fmtMoney(k.openTotal);
   document.getElementById("kpiInvoicesSub").textContent = `${k.openCount} faturas não pagas`;
   document.getElementById("kpiPaid").textContent = fmtMoney(k.paidYearTotal);
@@ -349,7 +375,7 @@ async function load(){
     if(!CONFIG.AIRTABLE_TOKEN || CONFIG.AIRTABLE_TOKEN.startsWith("PAT_COLOQUE")){
       throw new Error("Configure CONFIG.AIRTABLE_TOKEN no topo do arquivo HTML antes de hospedar.");
     }
-    const [clients, profit, invoices, installs, payments, aromaSales] = await Promise.all([
+    const [clients, profit, invoices, installs, payments, aromaSales, consumption] = await Promise.all([
       airtableFetchAll(CONFIG.TABLE_CLIENTS, {
         "fields[]":["Client","Status","Diffusers (number)","Receita bruta mes","Country"]
       }),
@@ -367,9 +393,12 @@ async function load(){
       }),
       airtableFetchAll(CONFIG.TABLE_AROMA_SALES, {
         "fields[]":["Total Fatura"]
+      }),
+      airtableFetchAll(CONFIG.TABLE_CONSUMPTION, {
+        "fields[]":["Custo Mensal"]
       })
     ]);
-    const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales});
+    const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption});
     render(k);
   }catch(e){
     console.error(e);
