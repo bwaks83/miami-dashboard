@@ -71,6 +71,13 @@
     width:150px;
     white-space:nowrap;
   }
+
+  .aroma-summary-table th:nth-child(2),
+  .aroma-summary-table td:nth-child(2){
+    width:190px;
+    white-space:nowrap;
+  }
+
   @media (max-width:1100px){
     .kpis{grid-template-columns:repeat(2,1fr)}
     .kpis-2{grid-template-columns:repeat(2,1fr)}
@@ -147,6 +154,17 @@
       </table>
     </div>
   </section>
+
+  <section class="row">
+    <div class="panel">
+      <h2>Monthly consumption by aroma</h2>
+      <table class="aroma-summary-table">
+        <thead><tr><th>Aroma</th><th class="num">Monthly Consumption</th></tr></thead>
+        <tbody id="tblAromaConsumption"><tr><td colspan="2" class="skeleton">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
 
 </main>
 
@@ -283,6 +301,26 @@ function getGrossRevClientMes(fields){
   return 0;
 }
 
+
+function getAromaName(fields){
+  const value = fields["Aroma"];
+
+  if(Array.isArray(value)){
+    const cleaned = value
+      .map(item => typeof item === "object" && item !== null ? (item.name || item.id || "") : String(item || ""))
+      .map(item => item.trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned.join(", ") : "Unspecified aroma";
+  }
+
+  if(typeof value === "object" && value !== null){
+    return (value.name || value.id || "Unspecified aroma").trim();
+  }
+
+  const text = String(value || "").trim();
+  return text || "Unspecified aroma";
+}
+
 function computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption}){
   const now = new Date();
   const yearStart = new Date(now.getFullYear(),0,1);
@@ -304,6 +342,18 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   // Monthly aroma consumption — Consumption table, "Monthly Consumption" column.
   // This field is already stored in liters.
   const aromaL = consumptionRecords.reduce((a,r)=>a+getMonthlyAromaConsumption(r.fields || {}),0);
+
+  // Monthly consumption grouped by Aroma — Consumption table.
+  const aromaConsumptionByName = Object.values(consumptionRecords.reduce((acc, r)=>{
+    const fields = r.fields || {};
+    const name = getAromaName(fields);
+    const liters = getMonthlyAromaConsumption(fields);
+    if(!acc[name]) acc[name] = { name, liters: 0 };
+    acc[name].liters += liters;
+    return acc;
+  }, {}))
+    .filter(item => item.liters > 0)
+    .sort((a,b)=>b.liters-a.liters);
 
   // Open invoices in the calendar year
   const openInvoices = invoices.filter(r=>{
@@ -379,7 +429,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
 
   return {
     totalClients, totalDiffusers, mrr, arr,
-    aromaL, aromaConsumptionCount: consumptionRecords.length,
+    aromaL, aromaConsumptionCount: consumptionRecords.length, aromaConsumptionByName,
     openTotal, openCount: openInvoices.length,
     paidYearTotal, paidYearCount: paidYearPayments.length,
     aromaSalesTotal, aromaSalesCount: aromaSalesRecords.length,
@@ -405,7 +455,7 @@ function render(k){
   document.getElementById("kpiInstallValueSub").textContent = `${k.installValueCount} installations with value`;
   document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
 
-  document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:1})} L`;
+  document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:1})}`;
   document.getElementById("kpiAromaSub").textContent = `${k.aromaConsumptionCount} records in Consumption`;
   document.getElementById("kpiAromaSales").textContent = fmtMoney2(k.aromaSalesTotal);
   document.getElementById("kpiAromaSalesSub").textContent = `${k.aromaSalesCount} sales recorded`;
@@ -448,6 +498,17 @@ function render(k){
         <td>${escapeHtml(c.name)}</td>
         <td class="num">${fmtNum(c.diffusers)}</td>
         <td class="num">${fmtMoney2(c.mrr)}</td>
+      </tr>
+    `).join("");
+
+  // Monthly consumption by aroma
+  const aromaConsumptionBody = document.getElementById("tblAromaConsumption");
+  aromaConsumptionBody.innerHTML = (k.aromaConsumptionByName || []).length===0
+    ? `<tr><td colspan="2" class="skeleton">No aroma consumption found.</td></tr>`
+    : k.aromaConsumptionByName.map(item=>`
+      <tr>
+        <td>${escapeHtml(item.name)}</td>
+        <td class="num">${item.liters.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:2})}</td>
       </tr>
     `).join("");
 
@@ -501,7 +562,7 @@ async function load(){
         "fields[]":["Total Fatura"]
       }),
       airtableFetchAll(CONFIG.TABLE_CONSUMPTION, {
-        "fields[]":["Custo Mensal","Monthly Consumption"]
+        "fields[]":["Aroma","Custo Mensal","Monthly Consumption"]
       })
     ]);
     const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption});
