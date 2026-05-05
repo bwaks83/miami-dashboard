@@ -63,6 +63,14 @@
     padding:14px 16px;border-radius:10px;margin-bottom:16px;font-size:14px;
   }
   .legend{font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* Mantém a data das instalações em uma única linha */
+  .install-table th:nth-child(2),
+  .install-table td:nth-child(2){
+    min-width:150px;
+    width:150px;
+    white-space:nowrap;
+  }
   @media (max-width:1100px){
     .kpis{grid-template-columns:repeat(2,1fr)}
     .kpis-2{grid-template-columns:repeat(2,1fr)}
@@ -97,9 +105,10 @@
     <div class="panel kpi"><div class="label">Receita anualizada (ARR)</div><div class="value" id="kpiARR">—</div><div class="sub">MRR × 12</div></div>
   </section>
 
-  <section class="grid kpis-5" style="margin-top:16px">
+  <section class="grid kpis-6" style="margin-top:16px">
     <div class="panel kpi"><div class="label">Consumo de aroma no mês</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
     <div class="panel kpi"><div class="label">Aroma vendido total</div><div class="value" id="kpiAromaSales">—</div><div class="sub" id="kpiAromaSalesSub"></div></div>
+    <div class="panel kpi"><div class="label">Recebido instalações</div><div class="value" id="kpiInstallValue">—</div><div class="sub" id="kpiInstallValueSub"></div></div>
     <div class="panel kpi"><div class="label">Faturas em aberto (ano)</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
     <div class="panel kpi"><div class="label">Total pago no ano</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
     <div class="panel kpi"><div class="label">Difusores instalados no mês</div><div class="value" id="kpiInstalls">—</div><div class="sub" id="kpiInstallsSub"></div></div>
@@ -107,14 +116,14 @@
 
   <section class="row">
     <div class="panel">
-      <h2>Próximas 5 instalações</h2>
-      <table>
+      <h2>Instalações programadas</h2>
+      <table class="install-table">
         <thead><tr><th>Cliente</th><th>Data</th><th class="num">Difusores</th><th>Status</th></tr></thead>
         <tbody id="tblNext"><tr><td colspan="4" class="skeleton">Carregando…</td></tr></tbody>
       </table>
     </div>
     <div class="panel">
-      <h2>Top 5 clientes por MRR</h2>
+      <h2>Top clientes por MRR</h2>
       <table>
         <thead><tr><th>Cliente</th><th class="num">Difusores</th><th class="num">MRR</th></tr></thead>
         <tbody id="tblTop"><tr><td colspan="3" class="skeleton">Carregando…</td></tr></tbody>
@@ -231,6 +240,20 @@ function getMonthlyAromaCost(fields){
   return 0;
 }
 
+function getInstallationValue(fields){
+  // Campo correto na tabela "Installations": coluna "Value".
+  const value = fields["Value"];
+
+  if(typeof value === "number") return value;
+
+  if(typeof value === "string"){
+    const parsed = Number(value.replace(/[^0-9.-]+/g, ""));
+    if(!Number.isNaN(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
 function getGrossRevClientMes(fields){
   // Campo correto na tabela "Profitability": coluna "Gross Rev Client / Mes".
   const value = fields["Gross Rev Client / Mes"];
@@ -292,6 +315,10 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   const consumptionRecords = consumption || [];
   const aromaCostMonth = consumptionRecords.reduce((a,r)=>a+getMonthlyAromaCost(r.fields || {}),0);
 
+  // Total recebido de instalações — tabela Installations, coluna Value
+  const installValueTotal = installs.reduce((a,r)=>a+getInstallationValue(r.fields || {}),0);
+  const installValueCount = installs.filter(r=>getInstallationValue(r.fields || {}) > 0).length;
+
   // Instalações
   const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
   const installsDone = installs.filter(isDone).filter(r=>r.fields.Date);
@@ -304,21 +331,21 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     .filter(r=>{const d=new Date(r.fields.Date+"T00:00:00");return d>=prevMonthStart && d<monthStart;})
     .reduce((a,r)=>a+(r.fields.Diffusers||0),0);
 
-  // Próximas 5 instalações: data futura E não "done"
+  // Instalações programadas: data futura E não "done"
   const upcoming = installs
     .filter(r=>r.fields.Date && !isDone(r))
     .filter(r=>new Date(r.fields.Date+"T00:00:00") >= new Date(now.getFullYear(),now.getMonth(),now.getDate()))
-    .sort((a,b)=>new Date(a.fields.Date) - new Date(b.fields.Date))
-    .slice(0,5);
+    .sort((a,b)=>new Date(a.fields.Date) - new Date(b.fields.Date));
 
-  // Top 5 clientes por MRR
+  // Top clientes por MRR — mantém o mesmo número de linhas das instalações programadas
+  const topClientsLimit = upcoming.length;
   const topClients = [...activeClients]
     .map(r=>({
       name: (r.fields.Client||"").split("\n")[0],
       mrr: r.fields["Receita bruta mes"]||0,
       diffusers: r.fields["Diffusers (number)"]||0
     }))
-    .sort((a,b)=>b.mrr-a.mrr).slice(0,5);
+    .sort((a,b)=>b.mrr-a.mrr).slice(0,topClientsLimit);
 
   // Maiores e menores Gross Rev Client / Mes — tabela Profitability
   const grossRows = [...activeProfit]
@@ -341,6 +368,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     paidYearTotal, paidYearCount: paidYearPayments.length,
     aromaSalesTotal, aromaSalesCount: aromaSalesRecords.length,
     aromaCostMonth, aromaCostCount: consumptionRecords.length,
+    installValueTotal, installValueCount,
     diffMonth, diffPrevMonth,
     pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
     cancelledClients: clients.filter(r=>r.fields.Status==="Cancelled").length,
@@ -357,6 +385,8 @@ function render(k){
   document.getElementById("kpiDiffusers").textContent = fmtNum(k.totalDiffusers);
   document.getElementById("kpiDiffusersSub").textContent = `em ${k.totalClients} clientes ativos`;
   document.getElementById("kpiMRR").textContent       = fmtMoney(k.mrr);
+  document.getElementById("kpiInstallValue").textContent = fmtMoney2(k.installValueTotal);
+  document.getElementById("kpiInstallValueSub").textContent = `${k.installValueCount} instalações com valor`;
   document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
 
   document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:1})} L`;
@@ -395,13 +425,15 @@ function render(k){
 
   // Top clients
   const topBody = document.getElementById("tblTop");
-  topBody.innerHTML = k.topClients.map(c=>`
-    <tr>
-      <td>${escapeHtml(c.name)}</td>
-      <td class="num">${fmtNum(c.diffusers)}</td>
-      <td class="num">${fmtMoney2(c.mrr)}</td>
-    </tr>
-  `).join("");
+  topBody.innerHTML = k.topClients.length===0
+    ? `<tr><td colspan="3" class="skeleton">Nenhum cliente para exibir.</td></tr>`
+    : k.topClients.map(c=>`
+      <tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td class="num">${fmtNum(c.diffusers)}</td>
+        <td class="num">${fmtMoney2(c.mrr)}</td>
+      </tr>
+    `).join("");
 
   // Gross Rev Client / Mes — maiores e menores
   const renderGrossRows = rows => rows.length===0
@@ -444,7 +476,7 @@ async function load(){
         "fields[]":["Invoice Number","Amount","Amount Paid","System Status","Invoice date"]
       }),
       airtableFetchAll(CONFIG.TABLE_INSTALLS, {
-        "fields[]":["Name","Date","Diffusers","Notes"]
+        "fields[]":["Name","Date","Diffusers","Notes","Value"]
       }),
       airtableFetchAll(CONFIG.TABLE_PAYMENTS, {
         "fields[]":["Date","Amount Paid"]
