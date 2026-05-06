@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Dashboard USA</title>
+<title>Dashboard Miami</title>
 <style>
   :root{
     --bg:#0f1115;
@@ -37,7 +37,8 @@
   .kpis{grid-template-columns:repeat(4,1fr);}
   .kpis-2{grid-template-columns:repeat(3,1fr);}
   .kpis-5{grid-template-columns:repeat(5,1fr);}
-  .kpis-6{grid-template-columns:repeat(6,1fr);} 
+  .kpis-6{grid-template-columns:repeat(6,1fr);}
+  .kpis-7{grid-template-columns:repeat(7,1fr);}  
   .panel{
     background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:18px 20px;
@@ -83,18 +84,19 @@
     .kpis-2{grid-template-columns:repeat(2,1fr)}
     .kpis-5{grid-template-columns:repeat(2,1fr)}
     .kpis-6{grid-template-columns:repeat(2,1fr)}
+    .kpis-7{grid-template-columns:repeat(2,1fr)}
     .row{grid-template-columns:1fr}
   }
   @media (max-width:600px){
     main{padding:14px}
     header{padding:14px}
-    .kpis,.kpis-2,.kpis-5,.kpis-6{grid-template-columns:1fr}
+    .kpis,.kpis-2,.kpis-5,.kpis-6,.kpis-7{grid-template-columns:1fr}
   }
 </style>
 </head>
 <body>
 <header>
-  <h1>Dashboard USA</h1>
+  <h1>Dashboard Miami</h1>
   <div class="meta">
     <span id="updated">Loading…</span>
     <button id="refreshBtn">Refresh</button>
@@ -107,17 +109,18 @@
   <section class="grid kpis-5">
     <div class="panel kpi"><div class="label">Active clients</div><div class="value" id="kpiClients">—</div><div class="sub" id="kpiClientsSub"></div></div>
     <div class="panel kpi"><div class="label">Active diffusers</div><div class="value" id="kpiDiffusers">—</div><div class="sub" id="kpiDiffusersSub"></div></div>
-    <div class="panel kpi"><div class="label">Recurring revenue (RR)</div><div class="value" id="kpiMRR">—</div><div class="sub">current month</div></div>
-    <div class="panel kpi"><div class="label">Monthly scent cost</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
-    <div class="panel kpi"><div class="label">Annualized revenue (AR)</div><div class="value" id="kpiARR">—</div><div class="sub">MRR × 12</div></div>
+    <div class="panel kpi"><div class="label">Recurring revenue (RR)</div><div class="value" id="kpiRR">—</div><div class="sub">current month</div></div>
+    <div class="panel kpi"><div class="label">Monthly aroma cost</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
+    <div class="panel kpi"><div class="label">Annualized revenue (ARR)</div><div class="value" id="kpiARR">—</div><div class="sub">RR × 12</div></div>
   </section>
 
-  <section class="grid kpis-6" style="margin-top:16px">
-    <div class="panel kpi"><div class="label">Monthly scent consumption (mL)</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
-    <div class="panel kpi"><div class="label">Retail sales (Diffusers + Scent)</div><div class="value" id="kpiAromaSales">—</div><div class="sub" id="kpiAromaSalesSub"></div></div>
-    <div class="panel kpi"><div class="label">Installation revenue</div><div class="value" id="kpiInstallValue">—</div><div class="sub" id="kpiInstallValueSub"></div></div>
-    <div class="panel kpi"><div class="label">Open invoices (2026)</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
-    <div class="panel kpi"><div class="label">Payments received</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
+  <section class="grid kpis-7" style="margin-top:16px">
+    <div class="panel kpi"><div class="label">Monthly aroma consumption</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
+    <div class="panel kpi"><div class="label">Total sold retail</div><div class="value" id="kpiAromaSales">—</div><div class="sub" id="kpiAromaSalesSub"></div></div>
+    <div class="panel kpi"><div class="label">Installation revenue received</div><div class="value" id="kpiInstallValue">—</div><div class="sub" id="kpiInstallValueSub"></div></div>
+    <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
+    <div class="panel kpi"><div class="label">Open invoices</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
+    <div class="panel kpi"><div class="label">Total paid this year</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
     <div class="panel kpi"><div class="label">Diffusers installed this month</div><div class="value" id="kpiInstalls">—</div><div class="sub" id="kpiInstallsSub"></div></div>
   </section>
 
@@ -130,9 +133,9 @@
       </table>
     </div>
     <div class="panel">
-      <h2>Top clients by MRR</h2>
+      <h2>Top clients by RR</h2>
       <table>
-        <thead><tr><th>Client</th><th class="num">Diffusers</th><th class="num">MRR</th></tr></thead>
+        <thead><tr><th>Client</th><th class="num">Diffusers</th><th class="num">RR</th></tr></thead>
         <tbody id="tblTop"><tr><td colspan="3" class="skeleton">Loading…</td></tr></tbody>
       </table>
     </div>
@@ -287,6 +290,29 @@ function getInstallationValue(fields){
   return 0;
 }
 
+function getInvoiceAmount(fields){
+  // Correct field in the "Invoices" table: "Amount" column.
+  const value = fields["Amount"];
+
+  if(typeof value === "number") return value;
+
+  if(typeof value === "string"){
+    const parsed = Number(value.replace(/[^0-9.-]+/g, ""));
+    if(!Number.isNaN(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
+function getServicePeriod(fields){
+  const value = fields["Service period"];
+
+  if(Array.isArray(value)) return value.join(" ");
+  if(value === null || value === undefined) return "";
+
+  return String(value);
+}
+
 function getGrossRevClientMes(fields){
   // Campo correto na tabela "Profitability": coluna "Gross Rev Client / Mes".
   const value = fields["Gross Rev Client / Mes"];
@@ -355,15 +381,20 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     .filter(item => item.liters > 0)
     .sort((a,b)=>b.liters-a.liters);
 
-  // Open invoices in the calendar year
+  // Open invoices — all unpaid invoices, including previous years.
+  // No date or Service period restriction is applied here.
   const openInvoices = invoices.filter(r=>{
-    const d = r.fields["Invoice date"];
-    if(!d) return false;
-    const date = new Date(d+"T00:00:00");
-    if(date < yearStart || date > now) return false;
     return r.fields["System Status"] !== "Paid";
   });
   const openTotal   = openInvoices.reduce((a,r)=>a+((r.fields.Amount||0) - (r.fields["Amount Paid"]||0)),0);
+
+  // Total invoiced 2026 — Invoices table, "Amount" column.
+  // Rule: Service period does not contain 2025.
+  const totalInvoiced2026Invoices = invoices.filter(r=>{
+    const servicePeriod = getServicePeriod(r.fields || {});
+    return !servicePeriod.includes("2025");
+  });
+  const totalInvoiced2026 = totalInvoiced2026Invoices.reduce((a,r)=>a+getInvoiceAmount(r.fields || {}),0);
 
   // Total paid this year: Payments com Date no ano calendário corrente,
   // independente da data da Invoice associada.
@@ -403,7 +434,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     .filter(r=>new Date(r.fields.Date+"T00:00:00") >= new Date(now.getFullYear(),now.getMonth(),now.getDate()))
     .sort((a,b)=>new Date(a.fields.Date) - new Date(b.fields.Date));
 
-  // Top clients by MRR — keeps the same number of rows as scheduled installations
+  // Top clients by RR — keeps the same number of rows as scheduled installations
   const topClientsLimit = upcoming.length;
   const topClients = [...activeClients]
     .map(r=>({
@@ -431,6 +462,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     totalClients, totalDiffusers, mrr, arr,
     aromaL, aromaConsumptionCount: consumptionRecords.length, aromaConsumptionByName,
     openTotal, openCount: openInvoices.length,
+    totalInvoiced2026, totalInvoiced2026Count: totalInvoiced2026Invoices.length,
     paidYearTotal, paidYearCount: paidYearPayments.length,
     aromaSalesTotal, aromaSalesCount: aromaSalesRecords.length,
     aromaCostMonth, aromaCostCount: consumptionRecords.length,
@@ -450,9 +482,11 @@ function render(k){
   document.getElementById("kpiClientsSub").textContent= `${k.pausedClients} paused · ${k.cancelledClients} cancelled`;
   document.getElementById("kpiDiffusers").textContent = fmtNum(k.totalDiffusers);
   document.getElementById("kpiDiffusersSub").textContent = `across ${k.totalClients} active clients`;
-  document.getElementById("kpiMRR").textContent       = fmtMoney(k.mrr);
+  document.getElementById("kpiRR").textContent       = fmtMoney(k.mrr);
   document.getElementById("kpiInstallValue").textContent = fmtMoney2(k.installValueTotal);
   document.getElementById("kpiInstallValueSub").textContent = `${k.installValueCount} installations with value`;
+  document.getElementById("kpiTotalInvoiced2026").textContent = fmtMoney2(k.totalInvoiced2026);
+  document.getElementById("kpiTotalInvoiced2026Sub").textContent = `${k.totalInvoiced2026Count} invoices excluding 2025 service periods`;
   document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
 
   document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:1})}`;
@@ -550,7 +584,7 @@ async function load(){
         "fields[]":["Client","Status","Consumo mes","Gross Rev Client / Mes"]
       }),
       airtableFetchAll(CONFIG.TABLE_INVOICES, {
-        "fields[]":["Invoice Number","Amount","Amount Paid","System Status","Invoice date"]
+        "fields[]":["Invoice Number","Amount","Amount Paid","System Status","Invoice date","Service period"]
       }),
       airtableFetchAll(CONFIG.TABLE_INSTALLS, {
         "fields[]":["Name","Date","Diffusers","Notes","Value"]
