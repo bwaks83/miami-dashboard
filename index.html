@@ -39,6 +39,77 @@
   .kpis-5{grid-template-columns:repeat(5,1fr);}
   .kpis-6{grid-template-columns:repeat(6,1fr);}
   .kpis-7{grid-template-columns:repeat(7,1fr);}  
+
+  .dashboard-groups{
+    display:grid;
+    grid-template-columns:minmax(280px,.85fr) minmax(0,1.65fr);
+    gap:18px;
+    align-items:stretch;
+  }
+  .metric-group{
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:18px;
+    position:relative;
+    overflow:hidden;
+  }
+  .metric-group::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    opacity:.55;
+  }
+  .metric-group-operations{
+    background:linear-gradient(145deg, rgba(106,169,255,.09), rgba(23,26,33,.96) 46%, rgba(23,26,33,.98));
+  }
+  .metric-group-operations::before{
+    background:radial-gradient(circle at top left, rgba(106,169,255,.12), transparent 42%);
+  }
+  .metric-group-finance{
+    background:linear-gradient(145deg, rgba(61,220,151,.08), rgba(23,26,33,.96) 46%, rgba(23,26,33,.98));
+  }
+  .metric-group-finance::before{
+    background:radial-gradient(circle at top left, rgba(61,220,151,.11), transparent 42%);
+  }
+  .group-header{
+    position:relative;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    margin-bottom:14px;
+    padding-bottom:12px;
+    border-bottom:1px solid rgba(138,147,166,.16);
+  }
+  .group-header h2{
+    margin:0;
+    font-size:16px;
+    color:var(--text);
+    letter-spacing:.4px;
+    text-transform:none;
+  }
+  .group-eyebrow{
+    color:var(--muted);
+    font-size:11px;
+    letter-spacing:.8px;
+    text-transform:uppercase;
+    margin-bottom:4px;
+  }
+  .group-kpis{
+    position:relative;
+    display:grid;
+    gap:14px;
+  }
+  .group-kpis-operations{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .group-kpis-finance{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  .metric-group .panel{
+    background:rgba(15,17,21,.58);
+    backdrop-filter:blur(6px);
+  }
   .panel{
     background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:18px 20px;
@@ -85,12 +156,16 @@
     .kpis-5{grid-template-columns:repeat(2,1fr)}
     .kpis-6{grid-template-columns:repeat(2,1fr)}
     .kpis-7{grid-template-columns:repeat(2,1fr)}
+    .dashboard-groups{grid-template-columns:1fr}
+    .group-kpis-finance{grid-template-columns:repeat(2,minmax(0,1fr))}
     .row{grid-template-columns:1fr}
   }
   @media (max-width:600px){
     main{padding:14px}
     header{padding:14px}
     .kpis,.kpis-2,.kpis-5,.kpis-6,.kpis-7{grid-template-columns:1fr}
+    .metric-group{padding:14px}
+    .group-kpis-operations,.group-kpis-finance{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -106,22 +181,42 @@
 <main>
   <div id="errorBox"></div>
 
-  <section class="grid kpis-5">
-    <div class="panel kpi"><div class="label">Active clients</div><div class="value" id="kpiClients">—</div><div class="sub" id="kpiClientsSub"></div></div>
-    <div class="panel kpi"><div class="label">Active diffusers</div><div class="value" id="kpiDiffusers">—</div><div class="sub" id="kpiDiffusersSub"></div></div>
-    <div class="panel kpi"><div class="label">Recurring revenue (RR)</div><div class="value" id="kpiRR">—</div><div class="sub">current month</div></div>
-    <div class="panel kpi"><div class="label">Monthly scent cost</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
-    <div class="panel kpi"><div class="label">Annualized revenue (ARR)</div><div class="value" id="kpiARR">—</div><div class="sub">RR × 12</div></div>
-  </section>
+  <section class="dashboard-groups">
+    <div class="metric-group metric-group-operations">
+      <div class="group-header">
+        <div>
+          <div class="group-eyebrow">Department</div>
+          <h2>Operations</h2>
+        </div>
+      </div>
 
-  <section class="grid kpis-7" style="margin-top:16px">
-    <div class="panel kpi"><div class="label">Monthly scent consumption (mL)</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
-    <div class="panel kpi"><div class="label">Retail sales (diffuser + scent)</div><div class="value" id="kpiAromaSales">—</div><div class="sub" id="kpiAromaSalesSub"></div></div>
-    <div class="panel kpi"><div class="label">Installation revenue</div><div class="value" id="kpiInstallValue">—</div><div class="sub" id="kpiInstallValueSub"></div></div>
-    <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
-    <div class="panel kpi"><div class="label">Open invoices</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
-    <div class="panel kpi"><div class="label">Payments received 2026</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
-    <div class="panel kpi"><div class="label">Diffusers installed this month</div><div class="value" id="kpiInstalls">—</div><div class="sub" id="kpiInstallsSub"></div></div>
+      <div class="group-kpis group-kpis-operations">
+        <div class="panel kpi"><div class="label">Active clients</div><div class="value" id="kpiClients">—</div><div class="sub" id="kpiClientsSub"></div></div>
+        <div class="panel kpi"><div class="label">Active diffusers</div><div class="value" id="kpiDiffusers">—</div><div class="sub" id="kpiDiffusersSub"></div></div>
+        <div class="panel kpi"><div class="label">Monthly scent consumption (mL)</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
+        <div class="panel kpi"><div class="label">Diffusers installed this month</div><div class="value" id="kpiInstalls">—</div><div class="sub" id="kpiInstallsSub"></div></div>
+      </div>
+    </div>
+
+    <div class="metric-group metric-group-finance">
+      <div class="group-header">
+        <div>
+          <div class="group-eyebrow">Department</div>
+          <h2>Finance</h2>
+        </div>
+      </div>
+
+      <div class="group-kpis group-kpis-finance">
+        <div class="panel kpi"><div class="label">Recurring revenue (RR)</div><div class="value" id="kpiRR">—</div><div class="sub">current month</div></div>
+        <div class="panel kpi"><div class="label">Monthly scent cost</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
+        <div class="panel kpi"><div class="label">Installation revenue 2026</div><div class="value" id="kpiInstallValue">—</div><div class="sub" id="kpiInstallValueSub"></div></div>
+        <div class="panel kpi"><div class="label">Retail sales 2026 (diffuser + scent)</div><div class="value" id="kpiAromaSales">—</div><div class="sub" id="kpiAromaSalesSub"></div></div>
+        <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
+        <div class="panel kpi"><div class="label">Open invoices</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
+        <div class="panel kpi"><div class="label">Payments received 2026</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
+        <div class="panel kpi"><div class="label">Annualized revenue (AR)</div><div class="value" id="kpiARR">—</div><div class="sub">RR × 12</div></div>
+      </div>
+    </div>
   </section>
 
   <section class="row">
@@ -483,17 +578,17 @@ function render(k){
   document.getElementById("kpiDiffusers").textContent = fmtNum(k.totalDiffusers);
   document.getElementById("kpiDiffusersSub").textContent = `across ${k.totalClients} active clients`;
   document.getElementById("kpiRR").textContent       = fmtMoney(k.mrr);
-  document.getElementById("kpiInstallValue").textContent = fmtMoney2(k.installValueTotal);
+  document.getElementById("kpiInstallValue").textContent = fmtMoney(k.installValueTotal);
   document.getElementById("kpiInstallValueSub").textContent = `${k.installValueCount} installations with value`;
-  document.getElementById("kpiTotalInvoiced2026").textContent = fmtMoney2(k.totalInvoiced2026);
+  document.getElementById("kpiTotalInvoiced2026").textContent = fmtMoney(k.totalInvoiced2026);
   document.getElementById("kpiTotalInvoiced2026Sub").textContent = `${k.totalInvoiced2026Count} invoices excluding 2025 service periods`;
   document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
 
-  document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:1})}`;
+  document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:0})}`;
   document.getElementById("kpiAromaSub").textContent = `${k.aromaConsumptionCount} records in Consumption`;
-  document.getElementById("kpiAromaSales").textContent = fmtMoney2(k.aromaSalesTotal);
+  document.getElementById("kpiAromaSales").textContent = fmtMoney(k.aromaSalesTotal);
   document.getElementById("kpiAromaSalesSub").textContent = `${k.aromaSalesCount} sales recorded`;
-  document.getElementById("kpiAromaCost").textContent = fmtMoney2(k.aromaCostMonth);
+  document.getElementById("kpiAromaCost").textContent = fmtMoney(k.aromaCostMonth);
   document.getElementById("kpiAromaCostSub").textContent = `${k.aromaCostCount} records in Consumption`;
   document.getElementById("kpiInvoices").textContent = fmtMoney(k.openTotal);
   document.getElementById("kpiInvoicesSub").textContent = `${k.openCount} unpaid invoices`;
