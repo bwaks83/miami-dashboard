@@ -114,9 +114,47 @@
     background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:18px 20px;
   }
-  .kpi .label{color:var(--muted);font-size:12px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
-  .kpi .value{font-size:28px;font-weight:600;line-height:1.1}
-  .kpi .sub{margin-top:6px;color:var(--muted);font-size:12px}
+  .kpi{
+    display:flex;
+    flex-direction:column;
+    min-height:128px;
+  }
+  .kpi .label{
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.25;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    min-height:30px;
+    margin-bottom:8px;
+    display:flex;
+    align-items:flex-start;
+  }
+  .kpi .value{
+    font-size:28px;
+    font-weight:600;
+    line-height:1.1;
+    min-height:34px;
+    display:flex;
+    align-items:flex-end;
+  }
+  .kpi .sub{
+    margin-top:8px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.35;
+    min-height:32px;
+    display:flex;
+    align-items:flex-start;
+  }
+
+  /* Slightly lower the first two Operations labels so they sit closer to their numbers */
+  .group-kpis-operations .kpi.ops-primary .label{
+    min-height:auto;
+    margin-top:14px;
+    margin-bottom:4px;
+    align-items:flex-end;
+  }
   .delta-up{color:var(--good)}
   .delta-down{color:var(--bad)}
   .delta-flat{color:var(--muted)}
@@ -191,8 +229,8 @@
       </div>
 
       <div class="group-kpis group-kpis-operations">
-        <div class="panel kpi"><div class="label">Active clients</div><div class="value" id="kpiClients">—</div><div class="sub" id="kpiClientsSub"></div></div>
-        <div class="panel kpi"><div class="label">Active diffusers</div><div class="value" id="kpiDiffusers">—</div><div class="sub" id="kpiDiffusersSub"></div></div>
+        <div class="panel kpi ops-primary"><div class="label">Active clients</div><div class="value" id="kpiClients">—</div><div class="sub" id="kpiClientsSub"></div></div>
+        <div class="panel kpi ops-primary"><div class="label">Active diffusers</div><div class="value" id="kpiDiffusers">—</div><div class="sub" id="kpiDiffusersSub"></div></div>
         <div class="panel kpi"><div class="label">Monthly scent consumption (mL)</div><div class="value" id="kpiAroma">—</div><div class="sub" id="kpiAromaSub"></div></div>
         <div class="panel kpi"><div class="label">Diffusers installed this month</div><div class="value" id="kpiInstalls">—</div><div class="sub" id="kpiInstallsSub"></div></div>
       </div>
