@@ -252,7 +252,7 @@
         <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
         <div class="panel kpi"><div class="label">Open invoices</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
         <div class="panel kpi"><div class="label">Payments received 2026</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
-        <div class="panel kpi"><div class="label">Annualized revenue (AR)</div><div class="value" id="kpiARR">—</div><div class="sub">RR × 12</div></div>
+        <div class="panel kpi"><div class="label">Projected Annual Revenue 2026</div><div class="value" id="kpiARR">—</div><div class="sub">(RR × 12) + installation + retail sales</div></div>
       </div>
     </div>
   </section>
@@ -276,14 +276,14 @@
 
   <section class="row">
     <div class="panel">
-      <h2>Highest Gross Rev per Diffuser (monthly fee - scent cost)</h2>
+      <h2>Highest Gross Rev per diffuser (monthly fee - scent cost)</h2>
       <table>
         <thead><tr><th>Client</th><th class="num">Gross Rev / Month</th></tr></thead>
         <tbody id="tblGrossHigh"><tr><td colspan="2" class="skeleton">Loading…</td></tr></tbody>
       </table>
     </div>
     <div class="panel">
-      <h2>Lowest Gross Rev per Diffuser (Monthly fee - scent cost)</h2>
+      <h2>Lowest Gross Rev per diffuser (Monthly fee - scent cost)</h2>
       <table>
         <thead><tr><th>Client</th><th class="num">Gross Rev / Month</th></tr></thead>
         <tbody id="tblGrossLow"><tr><td colspan="2" class="skeleton">Loading…</td></tr></tbody>
@@ -583,7 +583,6 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
 
   // Recurring revenue — Diffusers List table, "Monthly fee by diffuser" column.
   const mrr = diffusersListRecords.reduce((a,r)=>a+getNumberField(r.fields || {}, "Monthly fee by diffuser"),0);
-  const arr = mrr*12;
 
   const consumptionRecords = consumption || [];
 
@@ -636,6 +635,9 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   // Total recebido de instalações — tabela Installations, coluna Value
   const installValueTotal = installs.reduce((a,r)=>a+getInstallationValue(r.fields || {}),0);
   const installValueCount = installs.filter(r=>getInstallationValue(r.fields || {}) > 0).length;
+
+  // Projected Annual Revenue 2026 = (Recurring Revenue × 12) + Installation Revenue 2026 + Retail Sales 2026.
+  const arr = (mrr * 12) + installValueTotal + aromaSalesTotal;
 
   // Installations
   const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
