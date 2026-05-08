@@ -246,13 +246,13 @@
 
       <div class="group-kpis group-kpis-finance">
         <div class="panel kpi"><div class="label">Recurring revenue (RR)</div><div class="value" id="kpiRR">—</div><div class="sub">current month</div></div>
-        <div class="panel kpi"><div class="label">Monthly scent cost</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
         <div class="panel kpi"><div class="label">Installation revenue 2026</div><div class="value" id="kpiInstallValue">—</div><div class="sub" id="kpiInstallValueSub"></div></div>
         <div class="panel kpi"><div class="label">Retail sales 2026 (diffuser + scent)</div><div class="value" id="kpiAromaSales">—</div><div class="sub" id="kpiAromaSalesSub"></div></div>
-        <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
+        <div class="panel kpi"><div class="label">One-time Commissions 2026</div><div class="value" id="kpiUSCommission">—</div><div class="sub" id="kpiUSCommissionSub"></div></div>
+        <div class="panel kpi"><div class="label">Monthly scent cost</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
         <div class="panel kpi"><div class="label">Open invoices</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
-        <div class="panel kpi"><div class="label">Payments received 2026</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
-        <div class="panel kpi"><div class="label">Projected Annual Revenue 2026</div><div class="value" id="kpiARR">—</div><div class="sub">((RR - scent cost) × 12) + installation + retail sales</div></div>
+        <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
+        <div class="panel kpi"><div class="label">Projected Annual Revenue 2026</div><div class="value" id="kpiARR">—</div><div class="sub">((RR - scent cost) × 12) + installation + retail sales + US commission</div></div>
       </div>
     </div>
   </section>
@@ -323,6 +323,7 @@ const CONFIG = {
   TABLE_AROMA_SALES: "Aroma Sales",
   TABLE_CONSUMPTION: "Consumption",
   TABLE_DIFFUSERS_LIST: "Diffusers List",
+  TABLE_COMMISSIONS: "Comissions",
 
   CURRENCY: "USD",         // currency used in Airtable fields
   LOCALE:   "en-US",       // currency formatting (use "pt-BR" for R$)
@@ -564,7 +565,7 @@ function getAromaName(fields){
   return text || "Unspecified aroma";
 }
 
-function computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList}){
+function computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList, commissions}){
   const now = new Date();
   const yearStart = new Date(now.getFullYear(),0,1);
   const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
@@ -636,8 +637,12 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   const installValueTotal = installs.reduce((a,r)=>a+getInstallationValue(r.fields || {}),0);
   const installValueCount = installs.filter(r=>getInstallationValue(r.fields || {}) > 0).length;
 
-  // Projected Annual Revenue 2026 = ((Recurring Revenue - Monthly Scent Cost) × 12) + Installation Revenue 2026 + Retail Sales 2026.
-  const arr = ((mrr - aromaCostMonth) * 12) + installValueTotal + aromaSalesTotal;
+  // US Commissions — Comissions table, "US Comission" column.
+  const commissionRecords = commissions || [];
+  const usCommissionTotal = commissionRecords.reduce((a,r)=>a+getNumberField(r.fields || {}, "US Comission"),0);
+
+  // Projected Annual Revenue 2026 = ((Recurring Revenue - Monthly Scent Cost) × 12) + Installation Revenue 2026 + Retail Sales 2026 + US Commissions.
+  const arr = ((mrr - aromaCostMonth) * 12) + installValueTotal + aromaSalesTotal + usCommissionTotal;
 
   // Installations
   const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
@@ -689,6 +694,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     paidYearTotal, paidYearCount: paidYearPayments.length,
     aromaSalesTotal, aromaSalesCount: aromaSalesRecords.length,
     aromaCostMonth, aromaCostCount: diffusersListRecords.length,
+    usCommissionTotal, usCommissionCount: commissionRecords.length,
     installValueTotal, installValueCount,
     diffMonth, diffPrevMonth,
     pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
@@ -710,6 +716,8 @@ function render(k){
   document.getElementById("kpiInstallValueSub").textContent = `${k.installValueCount} installations with value`;
   document.getElementById("kpiTotalInvoiced2026").textContent = fmtMoney(k.totalInvoiced2026);
   document.getElementById("kpiTotalInvoiced2026Sub").textContent = `${k.totalInvoiced2026Count} invoices excluding 2025 service periods`;
+  document.getElementById("kpiUSCommission").textContent = fmtMoney(k.usCommissionTotal);
+  document.getElementById("kpiUSCommissionSub").textContent = `${k.usCommissionCount} commission records`;
   document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
 
   document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:0})}`;
@@ -720,9 +728,6 @@ function render(k){
   document.getElementById("kpiAromaCostSub").textContent = `${k.aromaCostCount} records in Diffusers List`;
   document.getElementById("kpiInvoices").textContent = fmtMoney(k.openTotal);
   document.getElementById("kpiInvoicesSub").textContent = `${k.openCount} unpaid invoices`;
-  document.getElementById("kpiPaid").textContent = fmtMoney(k.paidYearTotal);
-  document.getElementById("kpiPaidSub").textContent = `${k.paidYearCount} payments in ${new Date().getFullYear()}`;
-
   // Monthly comparison
   const delta = k.diffMonth - k.diffPrevMonth;
   const pct = k.diffPrevMonth ? (delta/k.diffPrevMonth*100) : (k.diffMonth?100:0);
@@ -799,7 +804,7 @@ async function load(){
     if(!CONFIG.AIRTABLE_TOKEN || CONFIG.AIRTABLE_TOKEN.startsWith("PAT_COLOQUE")){
       throw new Error("Configure CONFIG.AIRTABLE_TOKEN at the top of the HTML file before hosting.");
     }
-    const [clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList] = await Promise.all([
+    const [clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList, commissions] = await Promise.all([
       airtableFetchAll(CONFIG.TABLE_CLIENTS, {
         "fields[]":["Client","Status","Diffusers (number)","Receita bruta mes","Country"]
       }),
@@ -821,9 +826,12 @@ async function load(){
       airtableFetchAll(CONFIG.TABLE_CONSUMPTION, {
         "fields[]":["Aroma","Custo Mensal","Monthly Consumption"]
       }),
-      airtableFetchAll(CONFIG.TABLE_DIFFUSERS_LIST)
+      airtableFetchAll(CONFIG.TABLE_DIFFUSERS_LIST),
+      airtableFetchAll(CONFIG.TABLE_COMMISSIONS, {
+        "fields[]":["US Comission"]
+      })
     ]);
-    const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList});
+    const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList, commissions});
     render(k);
   }catch(e){
     console.error(e);
