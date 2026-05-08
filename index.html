@@ -252,7 +252,7 @@
         <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
         <div class="panel kpi"><div class="label">Open invoices</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
         <div class="panel kpi"><div class="label">Payments received 2026</div><div class="value" id="kpiPaid">—</div><div class="sub" id="kpiPaidSub"></div></div>
-        <div class="panel kpi"><div class="label">Projected Annual Revenue 2026</div><div class="value" id="kpiARR">—</div><div class="sub">(RR × 12) + installation + retail sales</div></div>
+        <div class="panel kpi"><div class="label">Projected Annual Revenue 2026</div><div class="value" id="kpiARR">—</div><div class="sub">((RR - scent cost) × 12) + installation + retail sales</div></div>
       </div>
     </div>
   </section>
@@ -636,8 +636,8 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   const installValueTotal = installs.reduce((a,r)=>a+getInstallationValue(r.fields || {}),0);
   const installValueCount = installs.filter(r=>getInstallationValue(r.fields || {}) > 0).length;
 
-  // Projected Annual Revenue 2026 = (Recurring Revenue × 12) + Installation Revenue 2026 + Retail Sales 2026.
-  const arr = (mrr * 12) + installValueTotal + aromaSalesTotal;
+  // Projected Annual Revenue 2026 = ((Recurring Revenue - Monthly Scent Cost) × 12) + Installation Revenue 2026 + Retail Sales 2026.
+  const arr = ((mrr - aromaCostMonth) * 12) + installValueTotal + aromaSalesTotal;
 
   // Installations
   const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
