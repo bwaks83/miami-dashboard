@@ -322,6 +322,7 @@ const CONFIG = {
   TABLE_PAYMENTS: "tblAN0l0I3ZfrsVqc",
   TABLE_AROMA_SALES: "Aroma Sales",
   TABLE_CONSUMPTION: "Consumption",
+  TABLE_DIFFUSERS_LIST: "Diffusers List",
 
   CURRENCY: "USD",         // currency used in Airtable fields
   LOCALE:   "en-US",       // currency formatting (use "pt-BR" for R$)
@@ -409,6 +410,68 @@ function getMonthlyAromaConsumption(fields){
   return 0;
 }
 
+function parseNumberValue(value){
+  if(typeof value === "number") return value;
+
+  // Airtable lookup/rollup fields can come as arrays.
+  // In that case, sum all numeric items found in the array.
+  if(Array.isArray(value)){
+    return value.reduce((sum, item)=>sum + parseNumberValue(item), 0);
+  }
+
+  // Some linked/lookup values can come as objects.
+  // Try the most common numeric/display properties before giving up.
+  if(typeof value === "object" && value !== null){
+    for(const key of ["value", "amount", "number", "name"]){
+      if(value[key] !== undefined){
+        const parsed = parseNumberValue(value[key]);
+        if(parsed !== 0) return parsed;
+      }
+    }
+    return 0;
+  }
+
+  if(typeof value === "string"){
+    // Handles Airtable values formatted as either US or Brazilian/European numbers.
+    let cleaned = value.replace(/[^0-9,.-]+/g, "");
+    if(!cleaned) return 0;
+
+    const lastComma = cleaned.lastIndexOf(",");
+    const lastDot = cleaned.lastIndexOf(".");
+
+    if(lastComma > lastDot){
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+
+    const parsed = Number(cleaned);
+    if(!Number.isNaN(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
+function getNumberField(fields, fieldName){
+  // First try the exact Airtable field name.
+  if(Object.prototype.hasOwnProperty.call(fields, fieldName)){
+    return parseNumberValue(fields[fieldName]);
+  }
+
+  // Then try a normalized match to avoid issues with extra spaces, accents,
+  // line breaks, or slightly different capitalization in Airtable.
+  const normalize = str => String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  const target = normalize(fieldName);
+  const matchedKey = Object.keys(fields).find(key => normalize(key) === target);
+  return matchedKey ? parseNumberValue(fields[matchedKey]) : 0;
+}
+
 function getInstallationValue(fields){
   // Campo correto na tabela "Installations": coluna "Value".
   const value = fields["Value"];
@@ -446,18 +509,39 @@ function getServicePeriod(fields){
   return String(value);
 }
 
-function getGrossRevClientMes(fields){
-  // Campo correto na tabela "Profitability": coluna "Gross Rev Client / Mes".
-  const value = fields["Gross Rev Client / Mes"];
+function getGrossRev(fields){
+  // Correct field in the "Diffusers List" table: "Gross Rev" column.
+  return getNumberField(fields || {}, "Gross Rev");
+}
 
-  if(typeof value === "number") return value;
+function getDiffuserListClientName(fields){
+  const possibleFields = [
+    "Client", "Name", "Client Name", "Account", "Store",
+    "Cliente", "Company", "Company Name", "Location", "Store Name",
+    "Client / Store", "Client/Store", "Client Location", "Diffuser", "Diffuser Name"
+  ];
 
-  if(typeof value === "string"){
-    const parsed = Number(value.replace(/[^0-9.-]+/g, ""));
-    if(!Number.isNaN(parsed)) return parsed;
+  for(const fieldName of possibleFields){
+    const value = fields[fieldName];
+
+    if(Array.isArray(value)){
+      const cleaned = value
+        .map(item => typeof item === "object" && item !== null ? (item.name || item.id || "") : String(item || ""))
+        .map(item => item.trim())
+        .filter(Boolean);
+      if(cleaned.length) return cleaned.join(", ").split("\n")[0];
+    }
+
+    if(typeof value === "object" && value !== null){
+      const text = String(value.name || value.id || "").trim();
+      if(text) return text.split("\n")[0];
+    }
+
+    const text = String(value || "").trim();
+    if(text) return text.split("\n")[0];
   }
 
-  return 0;
+  return "—";
 }
 
 
@@ -480,7 +564,7 @@ function getAromaName(fields){
   return text || "Unspecified aroma";
 }
 
-function computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption}){
+function computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList}){
   const now = new Date();
   const yearStart = new Date(now.getFullYear(),0,1);
   const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
@@ -489,18 +573,22 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   // Active = Status "Active"
   const isActive = r => r.fields.Status === "Active";
   const activeClients = clients.filter(isActive);
-  const activeProfit  = profit.filter(isActive);
 
   const totalClients   = activeClients.length;
-  const totalDiffusers = activeClients.reduce((a,r)=>a+(r.fields["Diffusers (number)"]||0),0);
-  const mrr            = activeClients.reduce((a,r)=>a+(r.fields["Receita bruta mes"]||0),0);
-  const arr            = mrr*12;
+
+  const diffusersListRecords = diffusersList || [];
+
+  // Active diffusers — Diffusers List table, number of rows.
+  const totalDiffusers = diffusersListRecords.length;
+
+  // Recurring revenue — Diffusers List table, "Monthly fee by diffuser" column.
+  const mrr = diffusersListRecords.reduce((a,r)=>a+getNumberField(r.fields || {}, "Monthly fee by diffuser"),0);
+  const arr = mrr*12;
 
   const consumptionRecords = consumption || [];
 
-  // Monthly aroma consumption — Consumption table, "Monthly Consumption" column.
-  // This field is already stored in liters.
-  const aromaL = consumptionRecords.reduce((a,r)=>a+getMonthlyAromaConsumption(r.fields || {}),0);
+  // Monthly scent consumption — Diffusers List table, "Consumo mes (ml)" column.
+  const aromaL = diffusersListRecords.reduce((a,r)=>a+getNumberField(r.fields || {}, "Consumo mes (ml)"),0);
 
   // Monthly consumption grouped by Aroma — Consumption table.
   const aromaConsumptionByName = Object.values(consumptionRecords.reduce((acc, r)=>{
@@ -542,8 +630,8 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   const aromaSalesRecords = aromaSales || [];
   const aromaSalesTotal = aromaSalesRecords.reduce((a,r)=>a+getAromaSaleAmount(r.fields || {}),0);
 
-  // Monthly aroma cost — Consumption table, "Custo Mensal" column.
-  const aromaCostMonth = consumptionRecords.reduce((a,r)=>a+getMonthlyAromaCost(r.fields || {}),0);
+  // Monthly scent cost — Diffusers List table, "Custo mes" column.
+  const aromaCostMonth = diffusersListRecords.reduce((a,r)=>a+getNumberField(r.fields || {}, "Custo mes"),0);
 
   // Total recebido de instalações — tabela Installations, coluna Value
   const installValueTotal = installs.reduce((a,r)=>a+getInstallationValue(r.fields || {}),0);
@@ -577,28 +665,28 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     }))
     .sort((a,b)=>b.mrr-a.mrr).slice(0,topClientsLimit);
 
-  // Highest and lowest Gross Rev Client / Mes — Profitability table
-  const grossRows = [...activeProfit]
-    .map(r=>({
-      name: (r.fields.Client||"").split("\n")[0] || "—",
-      gross: getGrossRevClientMes(r.fields || {})
+  // Highest and lowest Gross Rev — Diffusers List table, "Gross Rev" column.
+  // Ignore zero/blank values so the lists only show records with real Gross Rev.
+  const grossRows = diffusersListRecords
+    .map((r, index)=>({
+      name: getDiffuserListClientName(r.fields || {}) || `Record ${index + 1}`,
+      gross: getGrossRev(r.fields || {})
     }))
-    .filter(r=>r.name !== "—" && Number.isFinite(r.gross));
+    .filter(r=>Number.isFinite(r.gross) && r.gross > 0);
 
   const grossHigh = [...grossRows].sort((a,b)=>b.gross-a.gross).slice(0,10);
   const grossLow  = [...grossRows]
-    .filter(r=>r.gross > 0)
     .sort((a,b)=>a.gross-b.gross)
     .slice(0,10);
 
   return {
     totalClients, totalDiffusers, mrr, arr,
-    aromaL, aromaConsumptionCount: consumptionRecords.length, aromaConsumptionByName,
+    aromaL, aromaConsumptionCount: diffusersListRecords.length, aromaConsumptionByName,
     openTotal, openCount: openInvoices.length,
     totalInvoiced2026, totalInvoiced2026Count: totalInvoiced2026Invoices.length,
     paidYearTotal, paidYearCount: paidYearPayments.length,
     aromaSalesTotal, aromaSalesCount: aromaSalesRecords.length,
-    aromaCostMonth, aromaCostCount: consumptionRecords.length,
+    aromaCostMonth, aromaCostCount: diffusersListRecords.length,
     installValueTotal, installValueCount,
     diffMonth, diffPrevMonth,
     pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
@@ -623,11 +711,11 @@ function render(k){
   document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
 
   document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:0})}`;
-  document.getElementById("kpiAromaSub").textContent = `${k.aromaConsumptionCount} records in Consumption`;
+  document.getElementById("kpiAromaSub").textContent = `${k.aromaConsumptionCount} records in Diffusers List`;
   document.getElementById("kpiAromaSales").textContent = fmtMoney(k.aromaSalesTotal);
   document.getElementById("kpiAromaSalesSub").textContent = `${k.aromaSalesCount} sales recorded`;
   document.getElementById("kpiAromaCost").textContent = fmtMoney(k.aromaCostMonth);
-  document.getElementById("kpiAromaCostSub").textContent = `${k.aromaCostCount} records in Consumption`;
+  document.getElementById("kpiAromaCostSub").textContent = `${k.aromaCostCount} records in Diffusers List`;
   document.getElementById("kpiInvoices").textContent = fmtMoney(k.openTotal);
   document.getElementById("kpiInvoicesSub").textContent = `${k.openCount} unpaid invoices`;
   document.getElementById("kpiPaid").textContent = fmtMoney(k.paidYearTotal);
@@ -679,7 +767,7 @@ function render(k){
       </tr>
     `).join("");
 
-  // Gross Rev Client / Mes — highest and lowest
+  // Gross Rev — highest and lowest from Diffusers List
   const renderGrossRows = rows => rows.length===0
     ? `<tr><td colspan="2" class="skeleton">No records found.</td></tr>`
     : rows.map(c=>`
@@ -709,7 +797,7 @@ async function load(){
     if(!CONFIG.AIRTABLE_TOKEN || CONFIG.AIRTABLE_TOKEN.startsWith("PAT_COLOQUE")){
       throw new Error("Configure CONFIG.AIRTABLE_TOKEN at the top of the HTML file before hosting.");
     }
-    const [clients, profit, invoices, installs, payments, aromaSales, consumption] = await Promise.all([
+    const [clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList] = await Promise.all([
       airtableFetchAll(CONFIG.TABLE_CLIENTS, {
         "fields[]":["Client","Status","Diffusers (number)","Receita bruta mes","Country"]
       }),
@@ -730,9 +818,10 @@ async function load(){
       }),
       airtableFetchAll(CONFIG.TABLE_CONSUMPTION, {
         "fields[]":["Aroma","Custo Mensal","Monthly Consumption"]
-      })
+      }),
+      airtableFetchAll(CONFIG.TABLE_DIFFUSERS_LIST)
     ]);
-    const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption});
+    const k = computeKPIs({clients, profit, invoices, installs, payments, aromaSales, consumption, diffusersList});
     render(k);
   }catch(e){
     console.error(e);
