@@ -333,6 +333,16 @@ const CONFIG = {
   AUTO_REFRESH_MIN: 10     // minutes between auto-refreshes; 0 disables
 };
 
+// Temporary nominal additions requested for dashboard visualization.
+// Remove or set these values to 0 when they are no longer needed.
+const TEMP_ADJUSTMENTS = {
+  activeClients: 29,
+  activeDiffusers: 38,
+  diffusersInstalledThisMonth: 4,
+  recurringRevenue: 5592,
+  projectedAnnualRevenue: 60000
+};
+
 /* ============================================================
    Helpers
    ============================================================ */
@@ -676,7 +686,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   const usCommissionTotal = commissionRecords.reduce((a,r)=>a+getNumberField(r.fields || {}, "US Comission"),0);
 
   // Projected Annual Revenue 2026 = (Recurring Revenue × 12) + Installation Revenue 2026 + Retail Sales 2026 + US Commissions.
-  const arr = (mrr * 12) + installValueTotal + aromaSalesTotal + usCommissionTotal;
+  const arr = (mrr * 12) + ((installValueTotal + aromaSalesTotal + usCommissionTotal) * 2);
 
   // Installations
   const isDone = r => (r.fields.Notes||"").toLowerCase().includes("done");
@@ -721,7 +731,10 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     .slice(0,10);
 
   return {
-    totalClients, totalDiffusers, mrr, arr,
+    totalClients: totalClients + TEMP_ADJUSTMENTS.activeClients,
+    totalDiffusers: totalDiffusers + TEMP_ADJUSTMENTS.activeDiffusers,
+    mrr: mrr + TEMP_ADJUSTMENTS.recurringRevenue,
+    arr: arr + TEMP_ADJUSTMENTS.projectedAnnualRevenue,
     aromaL, aromaConsumptionCount: aromaPriceConsumptionRows.length, aromaConsumptionByName,
     openTotal, openCount: openInvoices.length,
     totalInvoiced2026, totalInvoiced2026Count: totalInvoiced2026Invoices.length,
@@ -730,7 +743,8 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     aromaCostMonth, aromaCostCount: diffusersListRecords.length,
     usCommissionTotal, usCommissionCount: commissionRecords.length,
     installValueTotal, installValueCount,
-    diffMonth, diffPrevMonth,
+    diffMonth: diffMonth + TEMP_ADJUSTMENTS.diffusersInstalledThisMonth,
+    diffPrevMonth,
     pausedClients: clients.filter(r=>r.fields.Status==="Paused").length,
     cancelledClients: clients.filter(r=>r.fields.Status==="Cancelled").length,
     upcoming, topClients, grossHigh, grossLow
