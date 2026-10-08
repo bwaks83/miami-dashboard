@@ -258,7 +258,7 @@
         <div class="panel kpi"><div class="label">Monthly scent cost</div><div class="value" id="kpiAromaCost">—</div><div class="sub" id="kpiAromaCostSub"></div></div>
         <div class="panel kpi"><div class="label">Open invoices</div><div class="value" id="kpiInvoices">—</div><div class="sub" id="kpiInvoicesSub"></div></div>
         <div class="panel kpi"><div class="label">Total invoiced 2026</div><div class="value" id="kpiTotalInvoiced2026">—</div><div class="sub" id="kpiTotalInvoiced2026Sub"></div></div>
-        <div class="panel kpi"><div class="label">Projected Annual Revenue 2026</div><div class="value" id="kpiARR">—</div><div class="sub" id="kpiARRSub">Average RR + installation + retail sales + US commission</div></div>
+        <div class="panel kpi"><div class="label">Projected Annual Revenue 2026</div><div class="value" id="kpiARR">—</div><div class="sub" id="kpiARRSub">Projected RR includes upcoming installation fees</div></div>
       </div>
     </div>
   </section>
@@ -709,8 +709,10 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   const commissionRecords = commissions || [];
   const usCommissionTotal = commissionRecords.reduce((a,r)=>a+getNumberField(r.fields || {}, "US Comission"),0);
 
-  // Use recorded monthly RR for completed months. The current month and every
-  // remaining month through December use the live current RR.
+  // Use recorded monthly RR for completed months. For the remaining months,
+  // start from current RR and add monthly fees for upcoming installations from
+  // their scheduled month through December. Count the installation month as a
+  // full month in this estimate.
   const completedMonths = now.getFullYear() < CONFIG.PROJECTION_YEAR
     ? 0
     : now.getFullYear() > CONFIG.PROJECTION_YEAR
@@ -735,11 +737,32 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
   const averageMrr = recordedRrByMonth.size
     ? historicalRrTotal / recordedRrByMonth.size
     : 0;
-  const projectedRecurringRevenue =
-    historicalRrTotal + (mrr * currentAndFutureMonths);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const upcomingInstallations = installs.filter(record=>{
+    const fields = record.fields || {};
+    if(!fields.Date || isDone(record)) return false;
+    const installationDate = new Date(fields.Date + "T00:00:00");
+    return installationDate >= today
+      && installationDate.getFullYear() === CONFIG.PROJECTION_YEAR
+      && getNumberField(fields, "Diffusers") > 0
+      && getNumberField(fields, "Monthly Fee") > 0;
+  });
+
+  let projectedRecurringRevenue = historicalRrTotal;
+  let upcomingInstallationRrAdded = 0;
+  for(let monthIndex = completedMonths; monthIndex < 12; monthIndex++){
+    const newInstallationMrr = upcomingInstallations
+      .filter(record=>new Date(record.fields.Date + "T00:00:00").getMonth() <= monthIndex)
+      .reduce((sum,record)=>{
+        const fields = record.fields || {};
+        return sum + getNumberField(fields, "Monthly Fee") * getNumberField(fields, "Diffusers");
+      },0);
+    projectedRecurringRevenue += mrr + newInstallationMrr;
+    upcomingInstallationRrAdded += newInstallationMrr;
+  }
 
   // Projected Annual Revenue 2026 = projected recurring revenue + projected one-time revenue.
-  const arr = projectedRecurringRevenue + ((installValueTotal + aromaSalesTotal + usCommissionTotal) * 2);
+  const arr = projectedRecurringRevenue + ((installValueTotal + aromaSalesTotal + usCommissionTotal) * 1);
 
   // Installations
   const installsDone = installs.filter(isDone).filter(r=>r.fields.Date);
@@ -805,6 +828,7 @@ function computeKPIs({clients, profit, invoices, installs, payments, aromaSales,
     completedMonths: recordedRrByMonth.size,
     currentAndFutureMonths,
     projectedRecurringRevenue,
+    upcomingInstallationRrAdded,
     arr,
     aromaL, aromaConsumptionCount: aromaPriceConsumptionRows.length, aromaConsumptionByName,
     openTotal, openCount: openInvoices.length,
@@ -839,7 +863,7 @@ function render(k){
   document.getElementById("kpiUSCommissionSub").textContent = `${k.usCommissionCount} commission records`;
   document.getElementById("kpiARR").textContent       = fmtMoney(k.arr);
   document.getElementById("kpiARRSub").textContent =
-    "Average RR + installation + retail sales + US commission";
+    `RR forecast includes ${fmtMoney(k.upcomingInstallationRrAdded)} from upcoming installation fees`;
 
   document.getElementById("kpiAroma").textContent    = `${k.aromaL.toLocaleString(CONFIG.DATE_LOCALE,{maximumFractionDigits:0})}`;
   document.getElementById("kpiAromaSub").textContent = `${k.aromaConsumptionCount} records in Aroma Prices`;
@@ -949,7 +973,7 @@ async function load(){
         "fields[]":["Invoice Number","Amount","Amount Paid","System Status","Invoice date","Service period"]
       }),
       airtableFetchAll(CONFIG.TABLE_INSTALLS, {
-        "fields[]":["Name","Date","Diffusers","Notes","Value"]
+        "fields[]":["Name","Date","Diffusers","Monthly Fee","Notes","Value"]
       }),
       airtableFetchAll(CONFIG.TABLE_PAYMENTS, {
         "fields[]":["Date","Amount Paid"]
