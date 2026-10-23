@@ -180,6 +180,20 @@
   }
   .legend{font-size:12px;color:var(--muted);margin-top:6px}
 
+  .history-header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .history-header h2{margin-bottom:8px}
+  .history-note{color:var(--muted);font-size:12px;line-height:1.6;margin:0}
+  .history-summary{display:flex;gap:24px;flex-wrap:wrap;margin:18px 0}
+  .history-summary strong{display:block;font-size:24px;margin-top:5px;color:var(--text)}
+  .history-legend{display:flex;gap:20px;flex-wrap:wrap;font-size:12px;margin:12px 0}
+  .history-key::before{content:"";display:inline-block;width:22px;height:3px;background:var(--accent);vertical-align:middle;margin-right:8px}
+  .history-key.removed::before{background:var(--bad)}
+  .history-key.net::before{background:var(--good)}
+  .history-scroll{overflow-x:auto}
+  .history-chart{display:block;width:100%;min-width:650px;height:auto}
+  .history-details{margin-top:16px;color:var(--muted);font-size:12px}
+  .history-details summary{cursor:pointer;margin-bottom:12px}
+
   /* Keeps installation dates on a single line */
   .install-table th:nth-child(2),
   .install-table td:nth-child(2){
@@ -263,6 +277,24 @@
     </div>
   </section>
 
+  <section class="row full">
+    <div class="panel">
+      <div class="history-header">
+        <div><h2>Diffuser history · 2026</h2>
+        <p class="history-note">Monthly installations and removals (left axis) and NET active diffusers (right axis).</p></div>
+        <span class="badge">Through Oct 22, 2026 · historical snapshot</span>
+      </div>
+      <div class="history-summary" id="diffuserHistorySummary"></div>
+      <div class="history-legend"><span class="history-key">Installed · left axis</span><span class="history-key removed">Removed · left axis</span><span class="history-key net">NET active · right axis</span></div>
+      <div class="history-scroll" id="diffuserHistoryChart"></div>
+      <p class="history-note">Estimated starting base on Dec 31, 2025: 205 = 233 active − 77 installations + 49 removals. NET = starting base + cumulative installations − cumulative removals. December includes 1 installation and 6 removals already reflected in its closing NET of 205. October is partial.</p>
+      <details class="history-details"><summary>View monthly figures and sources</summary>
+        <p>Installations: completed records in Airtable. Removals: manually supplied figures; March and May assumed zero. This snapshot does not change when refreshing live KPIs.</p>
+        <div class="history-scroll"><table><thead><tr><th>Month</th><th class="num">Installed</th><th class="num">Removed</th><th class="num">NET active</th></tr></thead><tbody id="diffuserHistoryRows"></tbody></table></div>
+      </details>
+    </div>
+  </section>
+
   <section class="row">
     <div class="panel">
       <h2>Scheduled installations</h2>
@@ -325,12 +357,7 @@
    CONFIGURATION — fill in before hosting
    ============================================================ */
 const CONFIG = {
-  // Paste here the Personal Access Token generated at https://airtable.com/create/tokens
-  // Required scopes: data.records:read, schema.bases:read
-  // Access scope: only the "B2B clients.csv" base
-  AIRTABLE_TOKEN: "patn8J4RFNsFkbWCm.221ea2efd972fd4c6c8b02d2e2f8ae1aeaf0da46843cadb9517c94fccfced47d",
-
-  BASE_ID:        "appPzeuPqekWJV5wR", // B2B clients.csv
+  // Airtable credentials are stored only on the server.
   TABLE_CLIENTS:  "tblEWpUn5Z2OFcQrE",
   TABLE_PROFIT:   "tblNhMV8EooNZUzWL",
   TABLE_INVOICES: "tblcOo172xvkBPa3Z",
@@ -366,7 +393,7 @@ const fmtDate = iso => {
 };
 async function airtableFetchAll(tableId, params={}){
   const safeTableId = encodeURIComponent(tableId);
-  const url = new URL(`https://api.airtable.com/v0/${CONFIG.BASE_ID}/${safeTableId}`);
+  const url = new URL(`/api/airtable?table=${safeTableId}`, window.location.origin);
   Object.entries(params).forEach(([k,v])=>{
     if(Array.isArray(v)) v.forEach(x=>url.searchParams.append(k,x));
     else url.searchParams.set(k,v);
@@ -375,7 +402,7 @@ async function airtableFetchAll(tableId, params={}){
   let offset;
   do{
     if(offset) url.searchParams.set("offset",offset);
-    const res = await fetch(url, { headers:{ Authorization:`Bearer ${CONFIG.AIRTABLE_TOKEN}` } });
+    const res = await fetch(url);
     if(!res.ok) throw new Error(`Airtable ${tableId}: ${res.status} ${res.statusText}`);
     const data = await res.json();
     records.push(...data.records);
@@ -950,6 +977,56 @@ function render(k){
 
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
+// Historical snapshot: installations through 2026-10-22 and user-supplied removals.
+// December removals are shown separately; opening is the closing balance after those removals.
+// Keep the inferred opening base fixed; live refreshes must not rewrite history.
+const DIFFUSER_HISTORY = {
+  opening: 205,
+  installed: [2,5,4,10,5,8,11,12,10,10],
+  removed: [33,2,0,1,0,1,8,1,1,2]
+};
+function buildDiffuserHistory(history){
+  let installed = 0, removed = 0;
+  return [{month:"Dec 25", installed:1, removed:6, gross:history.opening,
+    cumulativeRemoved:0, active:history.opening}, ...history.installed.map((quantity, index)=>{
+    installed += quantity;
+    removed += history.removed[index];
+    return {month: new Date(2026,index,1).toLocaleDateString(CONFIG.DATE_LOCALE,{month:"short"}),
+      installed:quantity, removed:history.removed[index],
+      gross:history.opening + installed, cumulativeRemoved:removed,
+      active:history.opening + installed - removed};
+  })];
+}
+function renderDiffuserHistory(){
+  const rows = buildDiffuserHistory(DIFFUSER_HISTORY);
+  const last = rows[rows.length-1];
+  document.getElementById("diffuserHistorySummary").innerHTML =
+    `<div class="history-note">Starting base<strong>${DIFFUSER_HISTORY.opening}</strong></div><div class="history-note">Installed in 2026<strong>${last.gross-DIFFUSER_HISTORY.opening}</strong></div><div class="history-note">Removed in 2026<strong>${last.cumulativeRemoved}</strong></div><div class="history-note">Active on Oct 22<strong>${last.active}</strong></div>`;
+  const width=1120, height=360, left=65, right=85, top=42, bottom=55;
+  const monthlyMax=Math.max(5,Math.ceil(Math.max(...rows.flatMap(r=>[r.installed,r.removed]))/5)*5);
+  const netMax=Math.max(50,Math.ceil(Math.max(DIFFUSER_HISTORY.opening,...rows.map(r=>r.active))/50)*50);
+  const x=i=>left+i*(width-left-right)/(rows.length-1);
+  const y=(value,maximum)=>height-bottom-value*(height-top-bottom)/maximum;
+  const grid=Array.from({length:6},(_,i)=>{
+    const ratio=i/5, position=y(ratio,1);
+    return `<line x1="${left}" y1="${position}" x2="${width-right}" y2="${position}" stroke="#262c38"/><text x="${left-12}" y="${position+4}" text-anchor="end">${Math.round(ratio*monthlyMax)}</text><text x="${width-right+12}" y="${position+4}" fill="#3ddc97">${Math.round(ratio*netMax)}</text>`;
+  }).join("");
+  const series=(key,color,label,maximum)=>`<polyline points="${rows.map((r,i)=>`${x(i)},${y(r[key],maximum)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="3"/>`+
+    rows.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r[key],maximum)}" r="5" fill="${color}" tabindex="0"><title>${r.month}: ${label} ${r[key]}; installed ${r.installed}, removed ${r.removed}, NET active ${r.active}</title></circle><text x="${x(i)}" y="${y(r[key],maximum)+(key==="removed" && r.removed>0?20:-12)}" text-anchor="middle" fill="${color}" font-weight="600" stroke="#171a21" stroke-width="4" paint-order="stroke">${r[key]}</text>`).join("");
+  document.getElementById("diffuserHistoryChart").innerHTML =
+    `<svg class="history-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="historyTitle historyDescription" style="font-family:inherit;font-size:12px;fill:#8a93a6">
+    <title id="historyTitle">Monthly installations, removals and NET active diffusers, December 2025 to October 2026</title>
+    <desc id="historyDescription">Left axis: monthly installed and removed diffusers. Right axis: NET active diffusers, starting at 205 in December 2025 and reaching 233 on October 22, 2026. Monthly figures available in the table below.</desc>
+    <text x="${left}" y="16">Installed / removed · diffusers</text><text x="${width-right}" y="16" text-anchor="end" fill="#3ddc97">NET active · diffusers</text>${grid}
+    ${rows.map((r,i)=>`<text x="${x(i)}" y="${height-bottom+24}" text-anchor="middle">${r.month}${i===rows.length-1?"*":""}</text>`).join("")}
+    <text x="${width/2}" y="${height-5}" text-anchor="middle">Month · Dec 2025 – Oct 2026</text>
+    ${series("installed","#6aa9ff","installed",monthlyMax)}${series("removed","#ff6b6b","removed",monthlyMax)}${series("active","#3ddc97","NET active",netMax)}
+    </svg>`;
+  document.getElementById("diffuserHistoryRows").innerHTML = rows.map(r=>
+    `<tr><td>${r.month}${r.month===last.month?" (through Oct 22)":""}</td>${[r.installed,r.removed,r.active].map(value=>`<td class="num">${value}</td>`).join("")}</tr>`).join("");
+}
+renderDiffuserHistory();
+
 /* ============================================================
    Boot
    ============================================================ */
@@ -959,9 +1036,6 @@ async function load(){
   document.getElementById("errorBox").innerHTML = "";
   document.getElementById("updated").textContent = "Loading…";
   try{
-    if(!CONFIG.AIRTABLE_TOKEN || CONFIG.AIRTABLE_TOKEN.startsWith("PAT_COLOQUE")){
-      throw new Error("Configure CONFIG.AIRTABLE_TOKEN at the top of the HTML file before hosting.");
-    }
     const [clients, profit, invoices, installs, payments, aromaSales, consumption, aromaPrices, diffusersList, commissions, rrHistory] = await Promise.all([
       airtableFetchAll(CONFIG.TABLE_CLIENTS, {
         "fields[]":["Client","Status","Diffusers (number)","Receita bruta mes","Country","Chain"]
