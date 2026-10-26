@@ -1009,7 +1009,7 @@ function renderDiffuserHistory(){
   const y=(value,maximum)=>height-bottom-value*(height-top-bottom)/maximum;
   const grid=Array.from({length:6},(_,i)=>{
     const ratio=i/5, position=y(ratio,1);
-    return `<line x1="${left}" y1="${position}" x2="${width-right}" y2="${position}" stroke="#262c38"/><text x="${left-12}" y="${position+4}" text-anchor="end">${Math.round(ratio*monthlyMax)}</text><text x="${width-right+12}" y="${position+4}" fill="#3ddc97">${Math.round(ratio*netMax)}</text>`;
+    return `<line x1="${left}" y1="${position}" x2="${width-right}" y2="${position}" stroke="#262c38"/>`;
   }).join("");
   const series=(key,color,label,maximum)=>`<polyline points="${rows.map((r,i)=>`${x(i)},${y(r[key],maximum)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="3"/>`+
     rows.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r[key],maximum)}" r="5" fill="${color}" tabindex="0"><title>${r.month}: ${label} ${r[key]}; installed ${r.installed}, removed ${r.removed}, NET active ${r.active}</title></circle><text x="${x(i)}" y="${y(r[key],maximum)+(key==="removed" && r.removed>0?20:-12)}" text-anchor="middle" fill="${color}" font-weight="600" stroke="#171a21" stroke-width="4" paint-order="stroke">${r[key]}</text>`).join("");
