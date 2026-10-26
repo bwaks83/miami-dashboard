@@ -191,8 +191,6 @@
   .history-key.net::before{background:var(--good)}
   .history-scroll{overflow-x:auto}
   .history-chart{display:block;width:100%;min-width:650px;height:auto}
-  .history-details{margin-top:16px;color:var(--muted);font-size:12px}
-  .history-details summary{cursor:pointer;margin-bottom:12px}
 
   /* Keeps installation dates on a single line */
   .install-table th:nth-child(2),
@@ -287,11 +285,6 @@
       <div class="history-summary" id="diffuserHistorySummary"></div>
       <div class="history-legend"><span class="history-key">Installed</span><span class="history-key removed">Removed</span><span class="history-key net">NET active</span></div>
       <div class="history-scroll" id="diffuserHistoryChart"></div>
-      <p class="history-note">Estimated starting base on Dec 31, 2025: 205 = 233 active − 77 installations + 49 removals. NET = starting base + cumulative installations − cumulative removals. December includes 1 installation and 6 removals already reflected in its closing NET of 205. October is partial.</p>
-      <details class="history-details"><summary>View monthly figures and sources</summary>
-        <p>Installations: completed records in Airtable. Removals: manually supplied figures; March and May assumed zero. This snapshot does not change when refreshing live KPIs.</p>
-        <div class="history-scroll"><table><thead><tr><th>Month</th><th class="num">Installed</th><th class="num">Removed</th><th class="num">NET active</th></tr></thead><tbody id="diffuserHistoryRows"></tbody></table></div>
-      </details>
     </div>
   </section>
 
@@ -1016,14 +1009,12 @@ function renderDiffuserHistory(){
   document.getElementById("diffuserHistoryChart").innerHTML =
     `<svg class="history-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="historyTitle historyDescription" style="font-family:inherit;font-size:12px;fill:#8a93a6">
     <title id="historyTitle">Monthly installations, removals and NET active diffusers, December 2025 to October 2026</title>
-    <desc id="historyDescription">Left axis: monthly installed and removed diffusers. Right axis: NET active diffusers, starting at 205 in December 2025 and reaching 233 on October 22, 2026. Monthly figures available in the table below.</desc>
+    <desc id="historyDescription">Left axis: monthly installed and removed diffusers. Right axis: NET active diffusers, starting at 205 in December 2025 and reaching 233 on October 22, 2026.</desc>
     <text x="${left}" y="16">Installed / removed · diffusers</text><text x="${width-right}" y="16" text-anchor="end" fill="#3ddc97">NET active · diffusers</text>${grid}
     ${rows.map((r,i)=>`<text x="${x(i)}" y="${height-bottom+24}" text-anchor="middle">${r.month}${i===rows.length-1?"*":""}</text>`).join("")}
     <text x="${width/2}" y="${height-5}" text-anchor="middle">Month · Dec 2025 – Oct 2026</text>
     ${series("installed","#6aa9ff","installed",monthlyMax)}${series("removed","#ff6b6b","removed",monthlyMax)}${series("active","#3ddc97","NET active",netMax)}
     </svg>`;
-  document.getElementById("diffuserHistoryRows").innerHTML = rows.map(r=>
-    `<tr><td>${r.month}${r.month===last.month?" (through Oct 22)":""}</td>${[r.installed,r.removed,r.active].map(value=>`<td class="num">${value}</td>`).join("")}</tr>`).join("");
 }
 renderDiffuserHistory();
 
